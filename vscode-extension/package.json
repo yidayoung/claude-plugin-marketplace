@@ -1,0 +1,102 @@
+{
+  "name": "@claude-marketplace/plugin",
+  "displayName": "Claude Plugin Marketplace",
+  "description": "Claude Code 插件市场：浏览、安装、管理 Claude Code 技能插件",
+  "version": "0.1.0",
+  "publisher": "gdd-team",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "plugin",
+    "marketplace",
+    "skills"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:claudeMarketplace.open"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claude-marketplace-sidebar",
+          "title": "Plugin Market",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "claude-marketplace-sidebar": [
+        {
+          "id": "claudePluginMarketplace",
+          "name": "插件市场"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "claudeMarketplace.open",
+        "title": "打开插件市场",
+        "icon": "$(extensions)"
+      },
+      {
+        "command": "claudeMarketplace.refresh",
+        "title": "刷新插件列表",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "claudeMarketplace.addMarketplace",
+        "title": "添加插件市场",
+        "icon": "$(add)"
+      },
+      {
+        "command": "claudeMarketplace.installPlugin",
+        "title": "安装插件"
+      },
+      {
+        "command": "claudeMarketplace.uninstallPlugin",
+        "title": "卸载插件"
+      },
+      {
+        "command": "claudeMarketplace.updatePlugin",
+        "title": "更新插件",
+        "icon": "$(sync)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "claudeMarketplace.refresh",
+          "when": "view == claudePluginMarketplace",
+          "group": "navigation"
+        },
+        {
+          "command": "claudeMarketplace.addMarketplace",
+          "when": "view == claudePluginMarketplace",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.130",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
