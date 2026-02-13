@@ -1,0 +1,78 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "watch",
+      "path": "vscode-extension",
+      "problemMatcher": "$tsc-watch",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "label": "vscode: watch"
+    },
+    {
+      "label": "vscode: watch with webview",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "vscode: build-webview",
+        "vscode: watch"
+      ],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "detail": "先构建 webview，然后监听 Extension 代码变化"
+    },
+    {
+      "type": "npm",
+      "script": "compile",
+      "path": "vscode-extension",
+      "problemMatcher": "$tsc",
+      "presentation": {
+        "reveal": "silent"
+      },
+      "group": "build",
+      "label": "vscode: compile"
+    },
+    {
+      "type": "npm",
+      "script": "compile",
+      "path": "vscode-extension",
+      "problemMatcher": "$tsc",
+      "presentation": {
+        "reveal": "silent"
+      },
+      "group": "build",
+      "label": "vscode: compile extension only",
+      "detail": "仅编译插件代码（不编译 webview）"
+    },
+    {
+      "type": "npm",
+      "script": "build-webview",
+      "path": "vscode-extension",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": "build",
+      "label": "vscode: build-webview"
+    },
+    {
+      "label": "vscode: 全部构建",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "vscode: compile",
+        "vscode: build-webview"
+      ],
+      "problemMatcher": [],
+      "group": "build"
+    },
+  ]
+}
