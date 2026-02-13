@@ -1,0 +1,13 @@
+.plugin-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.plugin-list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+}

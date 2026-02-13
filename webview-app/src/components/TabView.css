@@ -1,0 +1,25 @@
+.tab-view {
+  display: flex;
+  border-bottom: 1px solid var(--vscode-widget-border);
+  background-color: var(--vscode-sideBar-background);
+}
+
+.tab {
+  flex: 1;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.tab.active {
+  border-bottom-color: var(--vscode-activityBar-activeBorder);
+  font-weight: 500;
+}
