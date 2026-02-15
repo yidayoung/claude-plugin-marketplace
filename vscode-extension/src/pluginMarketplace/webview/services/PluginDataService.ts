@@ -1,130 +1,79 @@
 // vscode-extension/src/pluginMarketplace/webview/services/PluginDataService.ts
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
 import * as vscode from 'vscode';
+import { CacheManager } from './CacheManager';
 import {
   execClaudeCommand,
-  Marketplace,
-  MarketplaceConfig,
-  MarketplacePlugin,
-  PluginFilter,
   PluginInfo,
+  InstalledPlugin,
+  MarketplaceInfo,
+  PluginFilter,
   PluginScope,
-  PluginStatus,
-  InstalledPlugin
+  Marketplace
 } from '../../types';
 
 /**
  * 插件数据服务类
- * 负责从市场文件和 CLI 命令获取插件数据
+ * 读取操作使用文件解析，修改操作使用 CLI 命令
  */
 export class PluginDataService {
-  private marketplaceCache: Map<string, MarketplaceConfig> = new Map();
-  private cacheTimestamp: number = 0;
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 分钟
+  private cache: CacheManager;
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(private context: vscode.ExtensionContext) {
+    this.cache = new CacheManager(context);
+  }
+
+  // ===== 读取操作 (文件解析，快速) =====
 
   /**
-   * Phase 1: 获取所有市场列表
+   * 获取所有市场
    */
   async getAllMarketplaces(): Promise<Marketplace[]> {
-    const result = await execClaudeCommand('plugin marketplace list --json');
-
-    if (result.status !== 'success' || !result.data) {
-      console.error('Failed to get marketplaces:', result.error);
-      return [];
-    }
-
-    // CLI 返回的数据可能是数组或对象
-    const marketplaces = Array.isArray(result.data) ? result.data : result.data.marketplaces || [];
-    return marketplaces;
+    const marketplaces = await this.cache.getMarketplaces();
+    return marketplaces.map(m => ({
+      name: m.name,
+      source: this.formatSource(m.source),
+      type: this.getSourceType(m.source)
+    }));
   }
 
   /**
-   * Phase 1: 从指定市场获取插件配置
-   */
-  async getPluginsFromMarket(marketplaceName: string): Promise<MarketplaceConfig | null> {
-    try {
-      // 检查缓存
-      if (this.marketplaceCache.has(marketplaceName) && this.isCacheValid()) {
-        return this.marketplaceCache.get(marketplaceName)!;
-      }
-
-      // 读取市场配置文件
-      const config = await this.readMarketplaceConfig(marketplaceName);
-
-      // 更新缓存
-      this.marketplaceCache.set(marketplaceName, config);
-      this.cacheTimestamp = Date.now();
-
-      return config;
-    } catch (error: any) {
-      console.error(`Failed to read marketplace config for ${marketplaceName}:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * Phase 1: 获取所有可用插件
-   */
-  async getAllAvailablePlugins(): Promise<PluginInfo[]> {
-    const marketplaces = await this.getAllMarketplaces();
-    const allPlugins: PluginInfo[] = [];
-
-    for (const marketplace of marketplaces) {
-      const config = await this.getPluginsFromMarket(marketplace.name);
-
-      if (!config) {
-        continue;
-      }
-
-      // 将 MarketplacePlugin 转换为 PluginInfo
-      const plugins: PluginInfo[] = config.plugins.map(plugin => ({
-        ...plugin,
-        marketplace: marketplace.name,
-        status: {
-          installed: false
-        }
-      }));
-
-      allPlugins.push(...plugins);
-    }
-
-    return allPlugins;
-  }
-
-  /**
-   * Phase 1: 获取已安装的插件
+   * 获取已安装插件
    */
   async getInstalledPlugins(): Promise<InstalledPlugin[]> {
-    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const plugins = await this.cache.getInstalledPlugins();
 
-    if (!workspacePath) {
-      console.warn('No workspace folder found');
-      return [];
-    }
+    // 合并启用状态
+    const enabled = await this.cache.getEnabledPlugins();
 
-    const result = await execClaudeCommand('plugin list --json', {
-      cwd: workspacePath
+    return plugins.map(plugin => {
+      const key = plugin.marketplace
+        ? `${plugin.name}@${plugin.marketplace}`
+        : plugin.name;
+      return {
+        ...plugin,
+        enabled: enabled.get(key) ?? true
+      };
     });
-
-    if (result.status !== 'success' || !result.data) {
-      console.error('Failed to get installed plugins:', result.error);
-      return [];
-    }
-
-    // CLI 返回的数据可能是数组或对象
-    const plugins = Array.isArray(result.data) ? result.data : result.data.plugins || [];
-    return plugins;
   }
 
   /**
-   * Phase 2: 获取插件状态
+   * 获取所有可用插件 (带状态)
    */
-  async getPluginStatus(pluginName: string): Promise<PluginStatus> {
+  async getAllAvailablePlugins(): Promise<PluginInfo[]> {
+    return this.cache.getAllPlugins();
+  }
+
+  /**
+   * 获取插件状态
+   */
+  async getPluginStatus(pluginName: string): Promise<{
+    installed: boolean;
+    enabled?: boolean;
+    scope?: PluginScope;
+    version?: string;
+    updateAvailable?: boolean;
+  }> {
     const installedPlugins = await this.getInstalledPlugins();
     const installedPlugin = installedPlugins.find(p => p.name === pluginName);
 
@@ -132,51 +81,21 @@ export class PluginDataService {
       return { installed: false };
     }
 
-    // 获取工作空间路径
-    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspacePath) {
-      console.warn('No workspace folder found');
-      return { installed: true, version: installedPlugin.version, updateAvailable: false };
-    }
-
-    // 获取规范的安装路径
-    const normalizePath = (p: string) => p.replace(/\\/g, '/');
-
-    const installPath = installedPlugin.installPath;
-    const normalizedInstallPath = normalizePath(installPath);
-
-    // 用户目录
-    const userPluginPath = path.join(os.homedir(), '.claude', 'plugins').replace(/\\/g, '/');
-
-    // 项目本地目录
-    const localPluginPath = path.join(workspacePath || '', '.claude', 'local').replace(/\\/g, '/');
-
-    // 判断安装范围
-    let scope: PluginScope = 'project';
-    if (normalizedInstallPath.startsWith(userPluginPath)) {
-      scope = 'user';
-    } else if (normalizedInstallPath.includes(localPluginPath)) {
-      scope = 'local';
-    }
-
-    // 检查是否有更新
-    const updateAvailable = await this.checkUpdate(pluginName, installedPlugin.version);
-
     return {
       installed: true,
-      scope,
+      enabled: installedPlugin.enabled,
+      scope: installedPlugin.scope,
       version: installedPlugin.version,
-      updateAvailable
+      updateAvailable: await this.checkUpdate(pluginName, installedPlugin.version)
     };
   }
 
   /**
-   * Phase 2: 筛选插件
+   * 筛选插件
    */
   filterPlugins(plugins: PluginInfo[], filter: PluginFilter): PluginInfo[] {
     let filtered = [...plugins];
 
-    // 关键字筛选
     if (filter.keyword) {
       const keyword = filter.keyword.toLowerCase();
       filtered = filtered.filter(plugin =>
@@ -185,12 +104,10 @@ export class PluginDataService {
       );
     }
 
-    // 市场筛选
     if (filter.marketplace) {
       filtered = filtered.filter(plugin => plugin.marketplace === filter.marketplace);
     }
 
-    // 状态筛选
     if (filter.status && filter.status !== 'all') {
       filtered = filtered.filter(plugin => {
         switch (filter.status) {
@@ -206,7 +123,6 @@ export class PluginDataService {
       });
     }
 
-    // 范围筛选
     if (filter.scope) {
       filtered = filtered.filter(plugin =>
         plugin.status.installed && plugin.status.scope === filter.scope
@@ -216,8 +132,10 @@ export class PluginDataService {
     return filtered;
   }
 
+  // ===== 修改操作 (CLI 命令，确保数据正确) =====
+
   /**
-   * Phase 3: 安装插件
+   * 安装插件
    */
   async installPlugin(
     pluginName: string,
@@ -225,69 +143,180 @@ export class PluginDataService {
     scope: PluginScope = 'user'
   ): Promise<{ success: boolean; error?: string }> {
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-
     if (!workspacePath) {
-      console.warn('No workspace folder found');
       return { success: false, error: '未找到工作区文件夹' };
     }
 
-    const pluginIdentifier = `"${pluginName}@${marketplaceName}"`;
-    const command = `plugin install ${pluginIdentifier} --scope ${scope}`;
+    const result = await execClaudeCommand(
+      `plugin install "${pluginName}@${marketplaceName}" --scope ${scope}`,
+      { cwd: workspacePath, timeout: 120000 }
+    );
 
-    const result = await execClaudeCommand(command, {
-      cwd: workspacePath,
-      timeout: 120000 // 2 分钟
-    });
-
-    // 清除缓存
-    this.marketplaceCache.clear();
+    this.cache.invalidate();
 
     if (result.status === 'success') {
       return { success: true };
     }
 
-    return {
-      success: false,
-      error: result.error || '安装失败'
-    };
+    return { success: false, error: result.error || '安装失败' };
   }
 
   /**
-   * Phase 3: 卸载插件
+   * 卸载插件
    */
   async uninstallPlugin(pluginName: string): Promise<{ success: boolean; error?: string }> {
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-
     if (!workspacePath) {
-      console.warn('No workspace folder found');
       return { success: false, error: '未找到工作区文件夹' };
     }
 
-    const command = `plugin uninstall "${pluginName}"`;
+    const result = await execClaudeCommand(
+      `plugin uninstall "${pluginName}"`,
+      { cwd: workspacePath }
+    );
 
-    const result = await execClaudeCommand(command, {
-      cwd: workspacePath
-    });
-
-    // 清除缓存
-    this.marketplaceCache.clear();
+    this.cache.invalidate();
 
     if (result.status === 'success') {
       return { success: true };
     }
 
-    return {
-      success: false,
-      error: result.error || '卸载失败'
-    };
+    return { success: false, error: result.error || '卸载失败' };
   }
 
   /**
-   * Phase 3: 检查插件更新
+   * 启用插件
+   */
+  async enablePlugin(
+    pluginName: string,
+    marketplaceName: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspacePath) {
+      return { success: false, error: '未找到工作区文件夹' };
+    }
+
+    const result = await execClaudeCommand(
+      `plugin enable "${pluginName}@${marketplaceName}"`,
+      { cwd: workspacePath }
+    );
+
+    this.cache.invalidate();
+
+    if (result.status === 'success') {
+      return { success: true };
+    }
+
+    return { success: false, error: result.error || '启用失败' };
+  }
+
+  /**
+   * 禁用插件
+   */
+  async disablePlugin(
+    pluginName: string,
+    marketplaceName: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspacePath) {
+      return { success: false, error: '未找到工作区文件夹' };
+    }
+
+    const result = await execClaudeCommand(
+      `plugin disable "${pluginName}@${marketplaceName}"`,
+      { cwd: workspacePath }
+    );
+
+    this.cache.invalidate();
+
+    if (result.status === 'success') {
+      return { success: true };
+    }
+
+    return { success: false, error: result.error || '禁用失败' };
+  }
+
+  /**
+   * 添加市场
+   */
+  async addMarketplace(source: string): Promise<{ success: boolean; error?: string }> {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspacePath) {
+      return { success: false, error: '未找到工作区文件夹' };
+    }
+
+    const result = await execClaudeCommand(
+      `plugin marketplace add ${source}`,
+      { cwd: workspacePath, timeout: 120000 }
+    );
+
+    this.cache.invalidate();
+
+    if (result.status === 'success') {
+      return { success: true };
+    }
+
+    return { success: false, error: result.error || '添加市场失败' };
+  }
+
+  /**
+   * 删除市场
+   */
+  async removeMarketplace(name: string): Promise<{ success: boolean; error?: string }> {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspacePath) {
+      return { success: false, error: '未找到工作区文件夹' };
+    }
+
+    const result = await execClaudeCommand(
+      `plugin marketplace remove ${name}`,
+      { cwd: workspacePath }
+    );
+
+    this.cache.invalidate();
+
+    if (result.status === 'success') {
+      return { success: true };
+    }
+
+    return { success: false, error: result.error || '删除市场失败' };
+  }
+
+  /**
+   * 更新市场
+   */
+  async updateMarketplace(name: string): Promise<{ success: boolean; error?: string }> {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspacePath) {
+      return { success: false, error: '未找到工作区文件夹' };
+    }
+
+    const result = await execClaudeCommand(
+      `plugin marketplace update ${name}`,
+      { cwd: workspacePath, timeout: 120000 }
+    );
+
+    this.cache.invalidate();
+
+    if (result.status === 'success') {
+      return { success: true };
+    }
+
+    return { success: false, error: result.error || '更新市场失败' };
+  }
+
+  /**
+   * 清除缓存
+   */
+  clearCache(): void {
+    this.cache.invalidate();
+  }
+
+  /**
+   * 检查插件更新
    */
   async checkUpdate(pluginName: string, installedVersion: string): Promise<boolean> {
     try {
-      // 获取所有可用插件
       const allPlugins = await this.getAllAvailablePlugins();
       const plugin = allPlugins.find(p => p.name === pluginName);
 
@@ -295,7 +324,6 @@ export class PluginDataService {
         return false;
       }
 
-      // 比较版本号
       const latestVersion = plugin.version;
       return this.compareVersions(latestVersion, installedVersion) > 0;
     } catch (error) {
@@ -304,33 +332,29 @@ export class PluginDataService {
     }
   }
 
-  /**
-   * 辅助方法: 读取市场配置文件
-   */
-  private async readMarketplaceConfig(marketplaceName: string): Promise<MarketplaceConfig> {
-    const marketplacePath = path.join(
-      os.homedir(),
-      '.claude',
-      'plugins',
-      'marketplaces',
-      marketplaceName,
-      '.claude-plugin',
-      'marketplace.json'
-    );
+  // ===== 辅助方法 =====
 
-    const content = await fs.readFile(marketplacePath, 'utf-8');
-    return JSON.parse(content);
+  private formatSource(source: MarketplaceInfo['source']): string {
+    if (source.source === 'github' && source.repo) {
+      return source.repo;
+    }
+    if (source.source === 'url' && source.url) {
+      return source.url;
+    }
+    if (source.source === 'directory' && source.path) {
+      return source.path;
+    }
+    return source.source;
+  }
+
+  private getSourceType(source: MarketplaceInfo['source']): 'url' | 'git' | 'local' {
+    if (source.source === 'directory') return 'local';
+    if (source.source === 'github' || source.source === 'git') return 'git';
+    return 'url';
   }
 
   /**
-   * 辅助方法: 检查缓存是否有效
-   */
-  private isCacheValid(): boolean {
-    return Date.now() - this.cacheTimestamp < this.CACHE_DURATION;
-  }
-
-  /**
-   * 辅助方法: 比较版本号
+   * 比较版本号
    * @returns 1: v1 > v2, -1: v1 < v2, 0: v1 === v2
    */
   private compareVersions(v1: string, v2: string): number {
@@ -346,13 +370,5 @@ export class PluginDataService {
     }
 
     return 0;
-  }
-
-  /**
-   * 清除缓存（用于手动刷新）
-   */
-  clearCache(): void {
-    this.marketplaceCache.clear();
-    this.cacheTimestamp = 0;
   }
 }

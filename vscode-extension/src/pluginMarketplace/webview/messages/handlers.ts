@@ -7,9 +7,14 @@ import {
   ExtensionMessage,
   InstallPluginPayload,
   UninstallPluginPayload,
+  EnablePluginPayload,
+  DisablePluginPayload,
   GetPluginsPayload,
   PluginsPayload,
-  PluginData
+  PluginData,
+  AddMarketplacePayload,
+  RemoveMarketplacePayload,
+  UpdateMarketplacePayload
 } from './types';
 
 /**
@@ -38,6 +43,26 @@ export class MessageHandler {
 
         case 'uninstallPlugin':
           await this.handleUninstallPlugin(message.payload as UninstallPluginPayload);
+          break;
+
+        case 'enablePlugin':
+          await this.handleEnablePlugin(message.payload as EnablePluginPayload);
+          break;
+
+        case 'disablePlugin':
+          await this.handleDisablePlugin(message.payload as DisablePluginPayload);
+          break;
+
+        case 'addMarketplace':
+          await this.handleAddMarketplace(message.payload as AddMarketplacePayload);
+          break;
+
+        case 'removeMarketplace':
+          await this.handleRemoveMarketplace(message.payload as RemoveMarketplacePayload);
+          break;
+
+        case 'updateMarketplace':
+          await this.handleUpdateMarketplace(message.payload as UpdateMarketplacePayload);
           break;
 
         case 'refresh':
@@ -106,6 +131,7 @@ export class MessageHandler {
         category: p.category,
         marketplace: p.marketplace,
         installed: p.status.installed,
+        enabled: p.status.enabled,
         scope: p.status.scope,
         updateAvailable: p.status.updateAvailable
       }));
@@ -226,6 +252,220 @@ export class MessageHandler {
 
           vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 卸载失败: ${errorMessage}`);
           throw error;
+        }
+      }
+    );
+  }
+
+  /**
+   * 启用插件
+   */
+  private async handleEnablePlugin(payload: EnablePluginPayload): Promise<void> {
+    const { pluginName, marketplace } = payload;
+
+    try {
+      const result = await this.dataService.enablePlugin(pluginName, marketplace);
+
+      if (result.success) {
+        this.sendMessage({
+          type: 'enableSuccess',
+          payload: { pluginName, marketplace }
+        });
+
+        vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已启用`);
+      } else {
+        this.sendMessage({
+          type: 'enableError',
+          payload: { pluginName, error: result.error || '启用失败' }
+        });
+
+        vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 启用失败: ${result.error}`);
+      }
+    } catch (error: any) {
+      const errorMessage = error.message || '未知错误';
+      this.sendMessage({
+        type: 'enableError',
+        payload: { pluginName, error: errorMessage }
+      });
+
+      vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 启用失败: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * 禁用插件
+   */
+  private async handleDisablePlugin(payload: DisablePluginPayload): Promise<void> {
+    const { pluginName, marketplace } = payload;
+
+    try {
+      const result = await this.dataService.disablePlugin(pluginName, marketplace);
+
+      if (result.success) {
+        this.sendMessage({
+          type: 'disableSuccess',
+          payload: { pluginName, marketplace }
+        });
+
+        vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已禁用`);
+      } else {
+        this.sendMessage({
+          type: 'disableError',
+          payload: { pluginName, error: result.error || '禁用失败' }
+        });
+
+        vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 禁用失败: ${result.error}`);
+      }
+    } catch (error: any) {
+      const errorMessage = error.message || '未知错误';
+      this.sendMessage({
+        type: 'disableError',
+        payload: { pluginName, error: errorMessage }
+      });
+
+      vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 禁用失败: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * 添加市场
+   */
+  private async handleAddMarketplace(payload: AddMarketplacePayload): Promise<void> {
+    const { source } = payload;
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `正在添加市场 ${source}...`,
+        cancellable: false
+      },
+      async () => {
+        try {
+          const result = await this.dataService.addMarketplace(source);
+
+          if (result.success) {
+            this.sendMessage({
+              type: 'marketplaceSuccess',
+              payload: { action: 'add', source }
+            });
+
+            vscode.window.showInformationMessage(`✅ 市场 ${source} 添加成功`);
+          } else {
+            this.sendMessage({
+              type: 'marketplaceError',
+              payload: { action: 'add', error: result.error || '添加失败' }
+            });
+
+            vscode.window.showErrorMessage(`❌ 市场 ${source} 添加失败: ${result.error}`);
+          }
+        } catch (error: any) {
+          const errorMessage = error.message || '未知错误';
+          this.sendMessage({
+            type: 'marketplaceError',
+            payload: { action: 'add', error: errorMessage }
+          });
+
+          vscode.window.showErrorMessage(`❌ 市场 ${source} 添加失败: ${errorMessage}`);
+        }
+      }
+    );
+  }
+
+  /**
+   * 删除市场
+   */
+  private async handleRemoveMarketplace(payload: RemoveMarketplacePayload): Promise<void> {
+    const { name } = payload;
+
+    // 显示确认对话框
+    const confirm = await vscode.window.showWarningMessage(
+      `确定要删除市场 ${name} 吗？`,
+      { modal: true },
+      '确定',
+      '取消'
+    );
+
+    if (confirm !== '确定') {
+      return;
+    }
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `正在删除市场 ${name}...`,
+        cancellable: false
+      },
+      async () => {
+        try {
+          const result = await this.dataService.removeMarketplace(name);
+
+          if (result.success) {
+            this.sendMessage({
+              type: 'marketplaceSuccess',
+              payload: { action: 'remove', name }
+            });
+
+            vscode.window.showInformationMessage(`✅ 市场 ${name} 删除成功`);
+          } else {
+            this.sendMessage({
+              type: 'marketplaceError',
+              payload: { action: 'remove', error: result.error || '删除失败' }
+            });
+
+            vscode.window.showErrorMessage(`❌ 市场 ${name} 删除失败: ${result.error}`);
+          }
+        } catch (error: any) {
+          const errorMessage = error.message || '未知错误';
+          this.sendMessage({
+            type: 'marketplaceError',
+            payload: { action: 'remove', error: errorMessage }
+          });
+
+          vscode.window.showErrorMessage(`❌ 市场 ${name} 删除失败: ${errorMessage}`);
+        }
+      }
+    );
+  }
+
+  /**
+   * 更新市场
+   */
+  private async handleUpdateMarketplace(payload: UpdateMarketplacePayload): Promise<void> {
+    const { name } = payload;
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `正在更新市场 ${name}...`,
+        cancellable: false
+      },
+      async () => {
+        try {
+          const result = await this.dataService.updateMarketplace(name);
+
+          if (result.success) {
+            this.sendMessage({
+              type: 'marketplaceSuccess',
+              payload: { action: 'update', name }
+            });
+
+            vscode.window.showInformationMessage(`✅ 市场 ${name} 更新成功`);
+          } else {
+            this.sendMessage({
+              type: 'marketplaceError',
+              payload: { action: 'update', error: result.error || '更新失败' }
+            });
+
+            vscode.window.showErrorMessage(`❌ 市场 ${name} 更新失败: ${result.error}`);
+          }
+        } catch (error: any) {
+          const errorMessage = error.message || '未知错误';
+          this.sendMessage({
+            type: 'marketplaceError',
+            payload: { action: 'update', error: errorMessage }
+          });
+
+          vscode.window.showErrorMessage(`❌ 市场 ${name} 更新失败: ${errorMessage}`);
         }
       }
     );

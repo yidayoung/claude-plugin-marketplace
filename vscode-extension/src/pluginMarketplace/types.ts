@@ -1,10 +1,29 @@
 // vscode-extension/src/pluginMarketplace/types.ts
 
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+
+/**
+ * Claude 配置文件路径常量
+ */
+export const CLAUDE_PATHS = {
+  home: path.join(os.homedir(), '.claude'),
+  installedPlugins: path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json'),
+  userSettings: path.join(os.homedir(), '.claude', 'settings.json'),
+  knownMarketplaces: path.join(os.homedir(), '.claude', 'plugins', 'known_marketplaces.json'),
+  marketplacesDir: path.join(os.homedir(), '.claude', 'plugins', 'marketplaces'),
+
+  getProjectSettings: (workspacePath: string) =>
+    path.join(workspacePath, '.claude', 'settings.local.json'),
+
+  getMarketplaceConfig: (marketplaceName: string) =>
+    path.join(os.homedir(), '.claude', 'plugins', 'marketplaces', marketplaceName, '.claude-plugin', 'marketplace.json')
+} as const;
 
 /**
  * Claude Code 插件信息
@@ -35,8 +54,10 @@ export interface Marketplace {
  */
 export interface InstalledPlugin {
   name: string;
+  marketplace?: string;
   version: string;
   enabled: boolean;
+  scope?: PluginScope;
   installPath: string;
 }
 
@@ -49,7 +70,8 @@ export type TreeItemType =
   | 'installed-plugin'
   | 'available-plugin'
   | 'installed-section'
-  | 'available-section';
+  | 'available-section'
+  | 'marketplace-hint';
 
 /**
  * 树节点基类
@@ -198,6 +220,7 @@ export type PluginScope = 'user' | 'project' | 'local';
  */
 export interface PluginStatus {
   installed: boolean;
+  enabled?: boolean;
   scope?: PluginScope;
   version?: string;
   updateAvailable?: boolean;
@@ -220,4 +243,61 @@ export interface PluginFilter {
   status?: 'all' | 'installed' | 'not-installed' | 'upgradable';
   marketplace?: string;
   scope?: PluginScope;
+}
+
+/**
+ * installed_plugins.json 数据结构
+ */
+export interface InstalledPluginsData {
+  version: number;
+  plugins: Record<string, Array<{
+    scope: PluginScope;
+    installPath: string;
+    version: string;
+    installedAt: string;
+    lastUpdated: string;
+    gitCommitSha?: string;
+  }>>;
+}
+
+/**
+ * settings.json 数据结构 (部分)
+ */
+export interface SettingsData {
+  enabledPlugins?: Record<string, boolean>;
+  [key: string]: any;
+}
+
+/**
+ * known_marketplaces.json 数据结构
+ */
+export interface KnownMarketplacesData {
+  [name: string]: {
+    source: {
+      source: 'github' | 'git' | 'directory' | 'url';
+      repo?: string;
+      path?: string;
+      url?: string;
+    };
+    installLocation: string;
+    lastUpdated: string;
+    autoUpdate?: boolean;
+  };
+}
+
+/**
+ * 市场信息
+ */
+export interface MarketplaceInfo {
+  name: string;
+  source: {
+    source: 'github' | 'git' | 'directory' | 'url';
+    repo?: string;
+    path?: string;
+    url?: string;
+  };
+  installLocation: string;
+  lastUpdated: Date;
+  autoUpdate?: boolean;
+  pluginCount?: number;
 }

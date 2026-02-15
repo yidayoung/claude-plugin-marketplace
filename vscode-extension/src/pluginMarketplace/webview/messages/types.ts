@@ -9,8 +9,13 @@ export type WebviewMessageType =
   | 'getPlugins'
   | 'installPlugin'
   | 'uninstallPlugin'
+  | 'enablePlugin'
+  | 'disablePlugin'
   | 'openDetail'
-  | 'refresh';
+  | 'refresh'
+  | 'addMarketplace'
+  | 'removeMarketplace'
+  | 'updateMarketplace';
 
 /**
  * Extension 发送给 Webview 的消息类型
@@ -21,6 +26,12 @@ export type ExtensionMessageType =
   | 'installError'
   | 'uninstallSuccess'
   | 'uninstallError'
+  | 'enableSuccess'
+  | 'enableError'
+  | 'disableSuccess'
+  | 'disableError'
+  | 'marketplaceSuccess'
+  | 'marketplaceError'
   | 'error';
 
 /**
@@ -86,6 +97,35 @@ export interface PluginData {
   category?: string;
   marketplace: string;
   installed: boolean;
+  enabled?: boolean;
   scope?: 'user' | 'project' | 'local';
   updateAvailable?: boolean;
+}
+
+/**
+ * 启用/禁用插件的消息负载
+ */
+export interface EnablePluginPayload {
+  pluginName: string;
+  marketplace: string;
+}
+
+export interface DisablePluginPayload {
+  pluginName: string;
+  marketplace: string;
+}
+
+/**
+ * 市场操作的消息负载
+ */
+export interface AddMarketplacePayload {
+  source: string;
+}
+
+export interface RemoveMarketplacePayload {
+  name: string;
+}
+
+export interface UpdateMarketplacePayload {
+  name: string;
 }
