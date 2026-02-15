@@ -2,16 +2,15 @@ import * as vscode from 'vscode';
 
 // 导入插件市场相关
 import { PluginManager } from './pluginMarketplace/pluginManager';
-import { MarketplaceManager } from './pluginMarketplace/marketplaceManager';
 import { PluginTreeProvider } from './pluginMarketplace/pluginTreeProvider';
-import { PluginTreeItem } from './pluginMarketplace/types';
+import { PluginTreeItem, PluginScope } from './pluginMarketplace/types';
 import { PluginMarketplacePanel } from './pluginMarketplace/webview/PluginMarketplacePanel';
 import { PluginDataService } from './pluginMarketplace/webview/services/PluginDataService';
 
 // 插件市场全局变量
 let pluginManager: PluginManager | undefined;
-let marketplaceManager: MarketplaceManager | undefined;
 let pluginTreeProvider: PluginTreeProvider | undefined;
+let dataService: PluginDataService | undefined;
 
 /**
  * 扩展激活入口
@@ -25,14 +24,15 @@ export function activate(context: vscode.ExtensionContext): void {
   if (!workspaceRoot) {
     console.warn('[Claude Plugin Marketplace] No workspace folder found');
     vscode.window.showWarningMessage(
-      'Claude Plugin Marketplace: Please open a workspace folder to use the Plugin Marketplace'
+      'Claude Plugin Marketplace: Please open a workspace folder to use the Plugin Marketplace',
+      'OK'
     );
   }
 
   // ========== 初始化插件市场 ==========
 
   pluginManager = new PluginManager(context);
-  marketplaceManager = new MarketplaceManager(context);
+  dataService = new PluginDataService(context);
 
   // 检查 Claude Code 是否安装
   pluginManager.checkClaudeInstalled().then((installed: boolean) => {
@@ -48,35 +48,21 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
 
-  // 初始化市场管理器
-  marketplaceManager.initialize().then(() => {
-    // 确保 pluginManager 和 marketplaceManager 已初始化
-    if (!pluginManager || !marketplaceManager) {
-      console.error('[Claude Plugin Marketplace] Failed to initialize plugin marketplace managers');
-      return;
+  // 注册 TreeDataProvider - 直接使用 context，不需要等待初始化
+  pluginTreeProvider = new PluginTreeProvider(context);
+  vscode.window.registerTreeDataProvider('claudePluginMarketplace', pluginTreeProvider);
+
+  // 注册打开插件市场命令
+  const openMarketplaceCommand = vscode.commands.registerCommand(
+    'claudePluginMarketplace.open',
+    () => {
+      PluginMarketplacePanel.createOrShow(context.extensionUri, dataService!);
     }
+  );
+  context.subscriptions.push(openMarketplaceCommand);
 
-    // 注册 TreeDataProvider
-    pluginTreeProvider = new PluginTreeProvider(pluginManager, marketplaceManager);
-    vscode.window.registerTreeDataProvider('claudePluginMarketplace', pluginTreeProvider);
-
-    // 创建数据服务实例
-    const dataService = new PluginDataService(context);
-
-    // 注册打开插件市场命令
-    const openMarketplaceCommand = vscode.commands.registerCommand(
-      'claudePluginMarketplace.open',
-      () => {
-        PluginMarketplacePanel.createOrShow(context.extensionUri, dataService);
-      }
-    );
-    context.subscriptions.push(openMarketplaceCommand);
-
-    // 注册命令
-    registerPluginMarketplaceCommands(context, pluginManager, marketplaceManager, pluginTreeProvider);
-
-    console.log('[Claude Plugin Marketplace] Plugin Marketplace initialized');
-  });
+  // 注册命令
+  registerPluginMarketplaceCommands(context, pluginTreeProvider, dataService);
 
   console.log('[Claude Plugin Marketplace] Extension activated successfully');
 }
@@ -86,7 +72,6 @@ export function activate(context: vscode.ExtensionContext): void {
  */
 export function deactivate(): void {
   console.log('[Claude Plugin Marketplace] Extension deactivated');
-  // Managers are automatically cleaned up by VS Code
 }
 
 /**
@@ -94,9 +79,8 @@ export function deactivate(): void {
  */
 function registerPluginMarketplaceCommands(
   context: vscode.ExtensionContext,
-  pluginManager: PluginManager,
-  marketplaceManager: MarketplaceManager,
-  treeProvider: PluginTreeProvider
+  treeProvider: PluginTreeProvider,
+  dataService: PluginDataService
 ) {
   // 刷新命令
   context.subscriptions.push(
@@ -108,23 +92,20 @@ function registerPluginMarketplaceCommands(
   // 添加市场命令
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.addMarketplace', async () => {
-      const name = await vscode.window.showInputBox({
-        prompt: '输入市场名称',
-        placeHolder: '例如: 内部市场'
-      });
-
-      if (!name) {
-        return;
-      }
-
       const source = await vscode.window.showInputBox({
-        prompt: '输入市场来源（URL/Git 仓库/本地路径）',
-        placeHolder: 'https://github.com/company/marketplace'
+        prompt: '输入市场来源',
+        placeHolder: 'owner/repo 或 https://github.com/owner/repo',
+        value: ''
       });
 
       if (source) {
-        await marketplaceManager.addMarketplace(name, source);
-        treeProvider.refresh();
+        const result = await dataService.addMarketplace(source);
+        if (result.success) {
+          vscode.window.showInformationMessage(`✅ 市场 ${source} 添加成功`);
+          treeProvider.refresh();
+        } else {
+          vscode.window.showErrorMessage(`❌ 添加市场失败: ${result.error}`);
+        }
       }
     })
   );
@@ -132,35 +113,74 @@ function registerPluginMarketplaceCommands(
   // 删除市场命令
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.removeMarketplace', async (marketplaceName: string) => {
-      const confirm = await vscode.window.showWarningMessage(
-        `确认删除市场 "${marketplaceName}"?`,
-        '确认',
-        '取消'
-      );
+    if (!marketplaceName) {
+      return;
+    }
 
-      if (confirm === '确认') {
-        await marketplaceManager.removeMarketplace(marketplaceName);
+    const confirm = await vscode.window.showWarningMessage(
+      `确认删除市场 "${marketplaceName}"?`,
+      { modal: true },
+      '确认',
+      '取消'
+    );
+
+    if (confirm === '确认') {
+      const result = await dataService.removeMarketplace(marketplaceName);
+      if (result.success) {
+        vscode.window.showInformationMessage(`✅ 市场 ${marketplaceName} 删除成功`);
         treeProvider.refresh();
+      } else {
+        vscode.window.showErrorMessage(`❌ 删除市场失败: ${result.error}`);
       }
-    })
+    }
+  })
   );
 
   // 刷新市场命令
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.refreshMarketplace', async (marketplaceName: string) => {
-      // Re-initialize the marketplace to refresh it
-      await marketplaceManager.initialize();
-      treeProvider.refresh();
+      if (!marketplaceName) {
+        return;
+      }
+
+      const result = await dataService.updateMarketplace(marketplaceName);
+      if (result.success) {
+        vscode.window.showInformationMessage(`✅ 市场 ${marketplaceName} 更新成功`);
+        treeProvider.refresh();
+      } else {
+        vscode.window.showErrorMessage(`❌ 更新市场失败: ${result.error}`);
+      }
     })
   );
 
   // 安装插件命令
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.installPlugin', async (item: PluginTreeItem) => {
-      if (item.type === 'available-plugin' && item.data) {
-        const { plugin, marketplace } = item.data;
-        await pluginManager.installPlugin(plugin.name, marketplace);
-        treeProvider.refresh();
+      const pluginName = item.data?.name || item.data?.plugin?.name;
+      const marketplaceName = item.data?.marketplaceName || item.data?.marketplace;
+
+      if (!pluginName || !marketplaceName) {
+        return;
+      }
+
+      // 选择安装范围
+      const scopeItems = [
+        { label: 'user', description: '当前用户的所有项目' },
+        { label: 'project', description: '当前项目' },
+        { label: 'local', description: '仅当前工作区' }
+      ] as const;
+      const scope = await vscode.window.showQuickPick(scopeItems, {
+        placeHolder: '选择安装范围'
+      });
+
+      if (scope) {
+        const result = await dataService.installPlugin(pluginName, marketplaceName, scope.label as PluginScope);
+        if (result.success) {
+          vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 安装成功`);
+          treeProvider.refresh();
+        } else {
+          vscode.window.showErrorMessage(`❌ 安装失败: ${result.error}`);
+        }
       }
     })
   );
@@ -168,17 +188,67 @@ function registerPluginMarketplaceCommands(
   // 卸载插件命令
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.uninstallPlugin', async (item: PluginTreeItem) => {
-      if (item.type === 'installed-plugin' && item.data) {
-        const confirm = await vscode.window.showWarningMessage(
-          `确认卸载插件 "${item.data.plugin.name}"?`,
-          '确认',
-          '取消'
-        );
+      const pluginName = item.data?.name || item.data?.plugin?.name;
 
-        if (confirm === '确认') {
-          await pluginManager.uninstallPlugin(item.data.plugin.name);
+      if (!pluginName) {
+        return;
+      }
+
+      const confirm = await vscode.window.showWarningMessage(
+        `确认卸载插件 "${pluginName}"?`,
+        { modal: true },
+        '确认',
+        '取消'
+      );
+
+      if (confirm === '确认') {
+        const result = await dataService.uninstallPlugin(pluginName);
+        if (result.success) {
+          vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 卸载成功`);
           treeProvider.refresh();
+        } else {
+          vscode.window.showErrorMessage(`❌ 卸载失败: ${result.error}`);
         }
+      }
+    })
+  );
+
+  // 启用插件命令
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudePluginMarketplace.enablePlugin', async (item: PluginTreeItem) => {
+      const pluginName = item.data?.name || item.data?.plugin?.name;
+      const marketplaceName = item.data?.marketplaceName || item.data?.marketplace || item.data?.plugin?.marketplace;
+
+      if (!pluginName || !marketplaceName) {
+        return;
+      }
+
+      const result = await dataService.enablePlugin(pluginName, marketplaceName);
+      if (result.success) {
+        vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已启用`);
+        treeProvider.refresh();
+      } else {
+        vscode.window.showErrorMessage(`❌ 启用失败: ${result.error}`);
+      }
+    })
+  );
+
+  // 禁用插件命令
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudePluginMarketplace.disablePlugin', async (item: PluginTreeItem) => {
+      const pluginName = item.data?.name || item.data?.plugin?.name;
+      const marketplaceName = item.data?.marketplaceName || item.data?.marketplace || item.data?.plugin?.marketplace;
+
+      if (!pluginName || !marketplaceName) {
+        return;
+      }
+
+      const result = await dataService.disablePlugin(pluginName, marketplaceName);
+      if (result.success) {
+        vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已禁用`);
+        treeProvider.refresh();
+      } else {
+        vscode.window.showErrorMessage(`❌ 禁用失败: ${result.error}`);
       }
     })
   );
@@ -186,9 +256,26 @@ function registerPluginMarketplaceCommands(
   // 更新插件命令
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.updatePlugin', async (item: PluginTreeItem) => {
-      if (item.type === 'installed-plugin' && item.data) {
-        await pluginManager.updatePlugin(item.data.plugin.name);
+      const pluginName = item.data?.name || item.data?.plugin?.name;
+      const marketplaceName = item.data?.marketplaceName || item.data?.marketplace;
+
+      if (!pluginName) {
+        return;
+      }
+
+      // 先卸载再安装
+      const uninstallResult = await dataService.uninstallPlugin(pluginName);
+      if (!uninstallResult.success) {
+        vscode.window.showErrorMessage(`❌ 更新失败: ${uninstallResult.error}`);
+        return;
+      }
+
+      const installResult = await dataService.installPlugin(pluginName, marketplaceName, 'user');
+      if (installResult.success) {
+        vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 更新成功`);
         treeProvider.refresh();
+      } else {
+        vscode.window.showErrorMessage(`❌ 更新失败: ${installResult.error}`);
       }
     })
   );
@@ -196,22 +283,29 @@ function registerPluginMarketplaceCommands(
   // 查看插件详情命令
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.showPluginDetails', async (item: PluginTreeItem) => {
-      if (item.data && item.data.plugin) {
-        const plugin = item.data.plugin;
-        const details = `
-名称: ${plugin.name}
-版本: ${plugin.version}
-描述: ${plugin.description}
-作者: ${plugin.author}
-仓库: ${plugin.repository}
-`;
+      const details = await treeProvider.getPluginDetails(
+        item.data?.name || item.data?.plugin?.name,
+        item.data?.marketplaceName || item.data?.marketplace
+      );
 
-        vscode.window.showInformationMessage(details, '关闭');
+      if (details) {
+        const detailText = `
+名称: ${details.name}
+版本: ${details.version}
+描述: ${details.description}
+作者: ${details.author?.name || '未知'}
+市场: ${details.marketplace}
+状态: ${details.status.installed ? '已安装' : '未安装'}
+${details.status.installed && details.status.enabled === false ? '启用状态: 已禁用' : ''}
+${details.homepage ? `主页: ${details.homepage}` : ''}
+`.trim();
+
+        vscode.window.showInformationMessage(detailText, '关闭');
       }
     })
   );
 
-  // 搜索插件命令
+  // 搜索插件命令 - 打开 Webview 并传递搜索关键词
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.searchPlugins', async () => {
       const searchTerm = await vscode.window.showInputBox({
@@ -220,8 +314,12 @@ function registerPluginMarketplaceCommands(
       });
 
       if (searchTerm) {
-        // TODO: 实现搜索功能
-        vscode.window.showInformationMessage(`搜索功能即将推出: ${searchTerm}`);
+        PluginMarketplacePanel.createOrShow(context.extensionUri, dataService);
+
+        // 延迟发送搜索消息，确保 Webview 已加载
+        setTimeout(() => {
+          PluginMarketplacePanel.currentPanel?.sendSearchTerm(searchTerm);
+        }, 500);
       }
     })
   );

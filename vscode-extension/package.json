@@ -17,8 +17,7 @@
     "skills"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:claudeMarketplace.open"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -41,45 +40,117 @@
     },
     "commands": [
       {
-        "command": "claudeMarketplace.open",
+        "command": "claudePluginMarketplace.open",
         "title": "打开插件市场",
         "icon": "$(extensions)"
       },
       {
-        "command": "claudeMarketplace.refresh",
+        "command": "claudePluginMarketplace.refresh",
         "title": "刷新插件列表",
         "icon": "$(refresh)"
       },
       {
-        "command": "claudeMarketplace.addMarketplace",
+        "command": "claudePluginMarketplace.addMarketplace",
         "title": "添加插件市场",
         "icon": "$(add)"
       },
       {
-        "command": "claudeMarketplace.installPlugin",
+        "command": "claudePluginMarketplace.removeMarketplace",
+        "title": "删除插件市场"
+      },
+      {
+        "command": "claudePluginMarketplace.refreshMarketplace",
+        "title": "刷新插件市场"
+      },
+      {
+        "command": "claudePluginMarketplace.installPlugin",
         "title": "安装插件"
       },
       {
-        "command": "claudeMarketplace.uninstallPlugin",
+        "command": "claudePluginMarketplace.uninstallPlugin",
         "title": "卸载插件"
       },
       {
-        "command": "claudeMarketplace.updatePlugin",
+        "command": "claudePluginMarketplace.updatePlugin",
         "title": "更新插件",
         "icon": "$(sync)"
+      },
+      {
+        "command": "claudePluginMarketplace.showPluginDetails",
+        "title": "查看插件详情"
+      },
+      {
+        "command": "claudePluginMarketplace.enablePlugin",
+        "title": "启用插件"
+      },
+      {
+        "command": "claudePluginMarketplace.disablePlugin",
+        "title": "禁用插件"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "claudeMarketplace.refresh",
+          "command": "claudePluginMarketplace.refresh",
           "when": "view == claudePluginMarketplace",
           "group": "navigation"
         },
         {
-          "command": "claudeMarketplace.addMarketplace",
+          "command": "claudePluginMarketplace.addMarketplace",
           "when": "view == claudePluginMarketplace",
           "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "claudePluginMarketplace.installPlugin",
+          "when": "view == claudePluginMarketplace && viewItem == available-plugin",
+          "group": "inline"
+        },
+        {
+          "command": "claudePluginMarketplace.installPlugin",
+          "when": "view == claudePluginMarketplace && viewItem == available-plugin",
+          "group": "1_pluginActions@1"
+        },
+        {
+          "command": "claudePluginMarketplace.showPluginDetails",
+          "when": "view == claudePluginMarketplace && viewItem == available-plugin",
+          "group": "1_pluginActions@2"
+        },
+        {
+          "command": "claudePluginMarketplace.updatePlugin",
+          "when": "view == claudePluginMarketplace && viewItem == installed-plugin",
+          "group": "inline"
+        },
+        {
+          "command": "claudePluginMarketplace.uninstallPlugin",
+          "when": "view == claudePluginMarketplace && viewItem == installed-plugin",
+          "group": "1_pluginActions@1"
+        },
+        {
+          "command": "claudePluginMarketplace.showPluginDetails",
+          "when": "view == claudePluginMarketplace && viewItem == installed-plugin",
+          "group": "1_pluginActions@2"
+        },
+        {
+          "command": "claudePluginMarketplace.enablePlugin",
+          "when": "view == claudePluginMarketplace && viewItem == installed-disabled",
+          "group": "inline"
+        },
+        {
+          "command": "claudePluginMarketplace.disablePlugin",
+          "when": "view == claudePluginMarketplace && viewItem == installed-enabled",
+          "group": "inline"
+        },
+        {
+          "command": "claudePluginMarketplace.removeMarketplace",
+          "when": "view == claudePluginMarketplace && viewItem == marketplace",
+          "group": "1_marketplaceActions@1"
+        },
+        {
+          "command": "claudePluginMarketplace.refreshMarketplace",
+          "when": "view == claudePluginMarketplace && viewItem == marketplace",
+          "group": "1_marketplaceActions@2"
         }
       ]
     }
@@ -88,11 +159,19 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile"
+    "pretest": "npm run compile",
+    "test": "jest",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "build-webview": "cd ../webview-app && npm run build && rm -rf ../vscode-extension/webview/dist && mkdir -p ../vscode-extension/webview/dist && cp -r dist/* ../vscode-extension/webview/dist/"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.0",
     "@types/node": "^18.19.130",
     "@types/vscode": "^1.80.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {

@@ -71,12 +71,19 @@ export type TreeItemType =
   | 'available-plugin'
   | 'installed-section'
   | 'available-section'
-  | 'marketplace-hint';
+  | 'loading';
 
 /**
  * 树节点基类
  */
 export class PluginTreeItem extends vscode.TreeItem {
+  // 插件状态（用于可用插件）
+  public pluginStatus?: {
+    installed: boolean;
+    enabled?: boolean;
+    updateAvailable?: boolean;
+  };
+
   constructor(
     public readonly type: TreeItemType,
     label: string,
@@ -85,19 +92,70 @@ export class PluginTreeItem extends vscode.TreeItem {
   ) {
     super(label, collapsibleState);
     this.contextValue = type;
+
+    // 根据状态设置图标
     this.iconPath = new vscode.ThemeIcon(this.getIcon());
+    this.tooltip = this.getTooltip();
   }
 
   private getIcon(): string {
-    switch (this.type) {
-      case 'marketplace': return 'database';
-      case 'installed-overview': return 'check';
-      case 'installed-plugin': return 'package';
-      case 'available-plugin': return 'package';
-      case 'installed-section': return 'check';
-      case 'available-section': return 'package';
-      default: return 'circle-outline';
+    // 已安装插件 - 根据启用状态显示不同图标
+    if (this.type === 'installed-plugin') {
+      if (this.data?.enabled === false) {
+        return 'circle-large-outline'; // 禁用
+      }
+      return 'check'; // 已启用
     }
+
+    // 可用插件 - 根据安装状态显示图标
+    if (this.type === 'available-plugin') {
+      if (this.pluginStatus?.installed) {
+        if (this.pluginStatus?.updateAvailable) {
+          return 'sync'; // 可更新
+        }
+        if (this.pluginStatus?.enabled === false) {
+          return 'circle-slash'; // 已安装但禁用
+        }
+        return 'check'; // 已安装
+      }
+      return 'circle-large-outline'; // 未安装
+    }
+
+    // 分组节点
+    if (this.type === 'installed-overview') return 'package';
+    if (this.type === 'installed-section') return 'check';
+    if (this.type === 'available-section') return 'extensions';
+    if (this.type === 'marketplace') return 'database';
+    if (this.type === 'loading') return 'loading~spin';
+
+    return 'circle-outline';
+  }
+
+  private getTooltip(): string {
+    if (this.type === 'installed-plugin') {
+      const status = this.data?.enabled === false ? ' (已禁用)' : ' (已启用)';
+      return `${this.data?.name || this.label} v${this.data?.version || ''}${status}\n${this.data?.description || ''}`;
+    }
+
+    if (this.type === 'available-plugin') {
+      const status = this.pluginStatus?.installed
+        ? (this.pluginStatus?.updateAvailable
+            ? ' (有更新可用)'
+            : (this.pluginStatus?.enabled === false ? ' (已安装但禁用)' : ' (已安装)'))
+        : '';
+      return `${this.data?.name || this.label}${status}\n${this.data?.description || ''}`;
+    }
+
+    return String(this.label || '');
+  }
+
+  /**
+   * 设置插件状态（用于可用插件）
+   */
+  setPluginStatus(status: { installed: boolean; enabled?: boolean; updateAvailable?: boolean }): void {
+    this.pluginStatus = status;
+    this.iconPath = new vscode.ThemeIcon(this.getIcon());
+    this.tooltip = this.getTooltip();
   }
 }
 
