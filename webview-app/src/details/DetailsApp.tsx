@@ -6,6 +6,7 @@ import { ReloadOutlined, LoadingOutlined } from '@ant-design/icons';
 import vscode from '../main';
 import DetailHeader from './DetailHeader';
 import DetailContent from './DetailContent';
+import '../details/details.css';
 
 // 本地类型定义
 export interface PluginDetailData {

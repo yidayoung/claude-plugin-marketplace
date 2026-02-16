@@ -1,0 +1,141 @@
+/* webview-app/src/details/details.css */
+
+.details-app {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.detail-header {
+  margin-bottom: 24px;
+}
+
+.detail-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.detail-section {
+  padding: 16px;
+  background: var(--vscode-editor-background);
+  border-radius: 8px;
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.detail-section h5 {
+  margin-bottom: 12px !important;
+  color: var(--vscode-foreground) !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.readme-content {
+  margin-top: 12px;
+}
+
+.markdown-body {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-body h1 {
+  font-size: 2em;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  padding-bottom: 0.3em;
+}
+
+.markdown-body h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  padding-bottom: 0.3em;
+}
+
+.markdown-body code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background: var(--vscode-textBlockQuote-background);
+  border-radius: 6px;
+}
+
+.markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background: var(--vscode-textBlockQuote-background);
+  border-radius: 6px;
+}
+
+.markdown-body pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 2em;
+}
+
+.markdown-body a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+.markdown-body img {
+  max-width: 100%;
+  box-sizing: content-box;
+}
+
+.markdown-body table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.markdown-body table th,
+.markdown-body table td {
+  padding: 6px 13px;
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.markdown-body table th {
+  font-weight: 600;
+  background: var(--vscode-textBlockQuote-background);
+}
+
+@media (max-width: 768px) {
+  .details-app {
+    padding: 16px;
+  }
+
+  .detail-header-top {
+    flex-direction: column;
+  }
+}
