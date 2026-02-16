@@ -13,6 +13,8 @@ export type WebviewMessageType =
   | 'disablePlugin'
   | 'updatePlugin'
   | 'openDetails'
+  | 'openExternal'
+  | 'copyToClipboard'
   | 'refresh'
   | 'addMarketplace'
   | 'removeMarketplace'

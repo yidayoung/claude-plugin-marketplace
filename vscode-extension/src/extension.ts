@@ -2,14 +2,15 @@ import * as vscode from 'vscode';
 
 // 导入插件市场相关
 import { PluginManager } from './pluginMarketplace/pluginManager';
-import { PluginTreeProvider } from './pluginMarketplace/pluginTreeProvider';
 import { PluginTreeItem, PluginScope } from './pluginMarketplace/types';
 import { PluginMarketplacePanel } from './pluginMarketplace/webview/PluginMarketplacePanel';
+import { PluginDetailsPanel } from './pluginMarketplace/webview/PluginDetailsPanel';
+import { SidebarWebviewViewProvider } from './pluginMarketplace/webview/SidebarWebviewView';
 import { PluginDataService } from './pluginMarketplace/webview/services/PluginDataService';
 
 // 插件市场全局变量
 let pluginManager: PluginManager | undefined;
-let pluginTreeProvider: PluginTreeProvider | undefined;
+let sidebarProvider: SidebarWebviewViewProvider | undefined;
 let dataService: PluginDataService | undefined;
 
 /**
@@ -48,9 +49,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
 
-  // 注册 TreeDataProvider - 直接使用 context，不需要等待初始化
-  pluginTreeProvider = new PluginTreeProvider(context);
-  vscode.window.registerTreeDataProvider('claudePluginMarketplace', pluginTreeProvider);
+  // 注册侧边栏 WebviewViewProvider
+  sidebarProvider = new SidebarWebviewViewProvider(context.extensionUri, dataService);
+  vscode.window.registerWebviewViewProvider('claudePluginMarketplaceSidebar', sidebarProvider);
 
   // 注册打开插件市场命令
   const openMarketplaceCommand = vscode.commands.registerCommand(
@@ -62,7 +63,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(openMarketplaceCommand);
 
   // 注册命令
-  registerPluginMarketplaceCommands(context, pluginTreeProvider, dataService);
+  registerPluginMarketplaceCommands(context, sidebarProvider, dataService);
 
   console.log('[Claude Plugin Marketplace] Extension activated successfully');
 }
@@ -79,13 +80,13 @@ export function deactivate(): void {
  */
 function registerPluginMarketplaceCommands(
   context: vscode.ExtensionContext,
-  treeProvider: PluginTreeProvider,
+  sidebarProvider: SidebarWebviewViewProvider,
   dataService: PluginDataService
 ) {
   // 刷新命令
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.refresh', () => {
-      treeProvider.refresh();
+      sidebarProvider.refreshData();
     })
   );
 
@@ -102,7 +103,7 @@ function registerPluginMarketplaceCommands(
         const result = await dataService.addMarketplace(source);
         if (result.success) {
           vscode.window.showInformationMessage(`✅ 市场 ${source} 添加成功`);
-          treeProvider.refresh();
+          sidebarProvider.refreshData();
         } else {
           vscode.window.showErrorMessage(`❌ 添加市场失败: ${result.error}`);
         }
@@ -128,7 +129,7 @@ function registerPluginMarketplaceCommands(
       const result = await dataService.removeMarketplace(marketplaceName);
       if (result.success) {
         vscode.window.showInformationMessage(`✅ 市场 ${marketplaceName} 删除成功`);
-        treeProvider.refresh();
+        sidebarProvider.refreshData();
       } else {
         vscode.window.showErrorMessage(`❌ 删除市场失败: ${result.error}`);
       }
@@ -146,14 +147,14 @@ function registerPluginMarketplaceCommands(
       const result = await dataService.updateMarketplace(marketplaceName);
       if (result.success) {
         vscode.window.showInformationMessage(`✅ 市场 ${marketplaceName} 更新成功`);
-        treeProvider.refresh();
+        sidebarProvider.refreshData();
       } else {
         vscode.window.showErrorMessage(`❌ 更新市场失败: ${result.error}`);
       }
     })
   );
 
-  // 安装插件命令
+  // 安装插件命令（保留用于 TreeItem 右键菜单，如果有的话）
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.installPlugin', async (item: PluginTreeItem) => {
       const pluginName = item.data?.name || item.data?.plugin?.name;
@@ -177,7 +178,7 @@ function registerPluginMarketplaceCommands(
         const result = await dataService.installPlugin(pluginName, marketplaceName, scope.label as PluginScope);
         if (result.success) {
           vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 安装成功`);
-          treeProvider.refresh();
+          sidebarProvider.refreshData();
         } else {
           vscode.window.showErrorMessage(`❌ 安装失败: ${result.error}`);
         }
@@ -205,7 +206,7 @@ function registerPluginMarketplaceCommands(
         const result = await dataService.uninstallPlugin(pluginName);
         if (result.success) {
           vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 卸载成功`);
-          treeProvider.refresh();
+          sidebarProvider.refreshData();
         } else {
           vscode.window.showErrorMessage(`❌ 卸载失败: ${result.error}`);
         }
@@ -226,7 +227,7 @@ function registerPluginMarketplaceCommands(
       const result = await dataService.enablePlugin(pluginName, marketplaceName);
       if (result.success) {
         vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已启用`);
-        treeProvider.refresh();
+        sidebarProvider.refreshData();
       } else {
         vscode.window.showErrorMessage(`❌ 启用失败: ${result.error}`);
       }
@@ -246,7 +247,7 @@ function registerPluginMarketplaceCommands(
       const result = await dataService.disablePlugin(pluginName, marketplaceName);
       if (result.success) {
         vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已禁用`);
-        treeProvider.refresh();
+        sidebarProvider.refreshData();
       } else {
         vscode.window.showErrorMessage(`❌ 禁用失败: ${result.error}`);
       }
@@ -273,35 +274,32 @@ function registerPluginMarketplaceCommands(
       const installResult = await dataService.installPlugin(pluginName, marketplaceName, 'user');
       if (installResult.success) {
         vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 更新成功`);
-        treeProvider.refresh();
+        sidebarProvider.refreshData();
       } else {
         vscode.window.showErrorMessage(`❌ 更新失败: ${installResult.error}`);
       }
     })
   );
 
-  // 查看插件详情命令
+  // 查看插件详情命令 - 打开详情 Panel
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.showPluginDetails', async (item: PluginTreeItem) => {
-      const details = await treeProvider.getPluginDetails(
-        item.data?.name || item.data?.plugin?.name,
-        item.data?.marketplaceName || item.data?.marketplace
-      );
+      const pluginName = item.data?.name || item.data?.plugin?.name;
+      const marketplaceName = item.data?.marketplaceName || item.data?.marketplace;
+      const isInstalled = item.data?.installed || item.data?.plugin?.installed || false;
 
-      if (details) {
-        const detailText = `
-名称: ${details.name}
-版本: ${details.version}
-描述: ${details.description}
-作者: ${details.author?.name || '未知'}
-市场: ${details.marketplace}
-状态: ${details.status.installed ? '已安装' : '未安装'}
-${details.status.installed && details.status.enabled === false ? '启用状态: 已禁用' : ''}
-${details.homepage ? `主页: ${details.homepage}` : ''}
-`.trim();
-
-        vscode.window.showInformationMessage(detailText, '关闭');
+      if (!pluginName || !marketplaceName) {
+        return;
       }
+
+      // 打开详情 Panel
+      await PluginDetailsPanel.createOrShow(
+        context.extensionUri,
+        context,
+        pluginName,
+        marketplaceName,
+        isInstalled
+      );
     })
   );
 
