@@ -30,7 +30,7 @@ export class PluginDetailsService {
     isInstalled: boolean
   ): Promise<PluginDetailData> {
     if (isInstalled) {
-      return this.getInstalledPluginDetail(pluginName);
+      return this.getInstalledPluginDetail(pluginName, marketplace);
     }
     return this.getRemotePluginDetail(pluginName, marketplace);
   }
@@ -38,7 +38,7 @@ export class PluginDetailsService {
   /**
    * 获取已安装插件的详情（从本地文件读取）
    */
-  public async getInstalledPluginDetail(pluginName: string): Promise<PluginDetailData> {
+  public async getInstalledPluginDetail(pluginName: string, marketplace: string): Promise<PluginDetailData> {
     // 获取插件目录
     const pluginPath = await this.getPluginPath(pluginName);
     if (!pluginPath) {
