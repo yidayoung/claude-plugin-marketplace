@@ -1,0 +1,184 @@
+// webview-app/src/details/DetailHeader.tsx
+
+import React from 'react';
+import { Space, Tag, Button, Dropdown, Tooltip, Typography, Divider } from 'antd';
+import {
+  DeleteOutlined,
+  DownloadOutlined,
+  UserOutlined,
+  FolderOutlined,
+  GithubOutlined,
+  LinkOutlined,
+  CopyOutlined,
+  CheckCircleFilled,
+  StopOutlined,
+  PoweroffOutlined,
+  StarFilled
+} from '@ant-design/icons';
+import type { MenuProps } from 'antd';
+import type { PluginDetailData } from './DetailsApp';
+
+const { Text, Title } = Typography;
+
+interface DetailHeaderProps {
+  plugin: PluginDetailData;
+  onInstall: (scope: 'user' | 'project') => void;
+  onUninstall: () => void;
+  onEnable: () => void;
+  onDisable: () => void;
+  onOpenExternal: (url: string) => void;
+  onCopy: (text: string) => void;
+}
+
+const scopeConfig = {
+  user: { label: '用户', icon: <UserOutlined />, color: '#52c41a' },
+  project: { label: '项目', icon: <FolderOutlined />, color: '#1890ff' },
+  local: { label: '本地', icon: <FolderOutlined />, color: '#8c8c8c' }
+} as const;
+
+const DetailHeader: React.FC<DetailHeaderProps> = ({
+  plugin,
+  onInstall,
+  onUninstall,
+  onEnable,
+  onDisable,
+  onOpenExternal,
+  onCopy
+}) => {
+  const isDisabled = plugin.installed && plugin.enabled === false;
+  const scopeInfo = plugin.scope ? scopeConfig[plugin.scope] : null;
+
+  const installMenuItems: MenuProps['items'] = [
+    {
+      key: 'user',
+      label: '安装到用户',
+      icon: <UserOutlined />,
+      onClick: () => onInstall('user')
+    },
+    {
+      key: 'project',
+      label: '安装到项目',
+      icon: <FolderOutlined />,
+      onClick: () => onInstall('project')
+    }
+  ];
+
+  const copyInstallCommand = () => {
+    onCopy(`claude plugin install "${plugin.name}@${plugin.marketplace}"`);
+  };
+
+  return (
+    <div className="detail-header">
+      <div className="detail-header-top">
+        <Space direction="vertical" size={4} style={{ flex: 1 }}>
+          <Space size="middle">
+            <Title level={3} style={{ margin: 0 }}>
+              {plugin.name}
+            </Title>
+            <Tag color="blue">v{plugin.version}</Tag>
+            {plugin.installed && !isDisabled && (
+              <Tooltip title="已启用">
+                <CheckCircleFilled style={{ color: '#52c41a', fontSize: 16 }} />
+              </Tooltip>
+            )}
+            {isDisabled && (
+              <Tooltip title="已禁用">
+                <StopOutlined style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 16 }} />
+              </Tooltip>
+            )}
+          </Space>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            {plugin.author && `作者: ${plugin.author} · `}
+            来自 {plugin.marketplace}
+            {plugin.repository?.stars && (
+              <span>
+                {' '}· <StarFilled style={{ color: '#faad14' }} /> {plugin.repository.stars}
+              </span>
+            )}
+          </Text>
+        </Space>
+
+        <Space size="middle">
+          {plugin.repository?.url && (
+            <Tooltip title="打开仓库">
+              <Button
+                type="text"
+                icon={<GithubOutlined />}
+                onClick={() => onOpenExternal(plugin.repository!.url)}
+              />
+            </Tooltip>
+          )}
+          {plugin.homepage && plugin.homepage !== plugin.repository?.url && (
+            <Tooltip title="打开主页">
+              <Button
+                type="text"
+                icon={<LinkOutlined />}
+                onClick={() => onOpenExternal(plugin.homepage!)}
+              />
+            </Tooltip>
+          )}
+
+          {plugin.installed ? (
+            <Space size="small">
+              <Tooltip title={isDisabled ? '启用' : '禁用'}>
+                <Button
+                  type={isDisabled ? 'primary' : 'default'}
+                  size="small"
+                  icon={<PoweroffOutlined />}
+                  onClick={isDisabled ? onEnable : onDisable}
+                >
+                  {isDisabled ? '启用' : '禁用'}
+                </Button>
+              </Tooltip>
+              {scopeInfo && (
+                <Tag
+                  icon={scopeInfo.icon}
+                  style={{
+                    borderRadius: 12,
+                    padding: '2px 10px',
+                    background: `${scopeInfo.color}15`,
+                    color: scopeInfo.color,
+                    border: `1px solid ${scopeInfo.color}30`
+                  }}
+                >
+                  {scopeInfo.label}
+                </Tag>
+              )}
+              <Tooltip title="复制安装命令">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={copyInstallCommand}
+                />
+              </Tooltip>
+              <Tooltip title="卸载">
+                <Button
+                  danger
+                  type="text"
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  onClick={onUninstall}
+                />
+              </Tooltip>
+            </Space>
+          ) : (
+            <Dropdown.Button
+              menu={{ items: installMenuItems }}
+              icon={<DownloadOutlined />}
+              onClick={() => onInstall('user')}
+              type="primary"
+              size="small"
+            >
+              安装
+            </Dropdown.Button>
+          )}
+        </Space>
+      </div>
+
+      <Divider style={{ margin: '12px 0' }} />
+    </div>
+  );
+};
+
+export default DetailHeader;
