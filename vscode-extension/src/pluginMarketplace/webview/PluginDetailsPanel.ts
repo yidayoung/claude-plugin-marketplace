@@ -212,7 +212,7 @@ export class PluginDetailsPanel {
     // 设置初始状态
     window.vscodeState = ${initState};
   </script>
-  <script src="${scriptUri}"></script>
+  <script type="module" src="${scriptUri}"></script>
 </body>
 </html>`;
   }

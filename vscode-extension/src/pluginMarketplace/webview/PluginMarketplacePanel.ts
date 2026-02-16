@@ -78,7 +78,7 @@ export class PluginMarketplacePanel {
     this._panel.webview.html = this._getHtmlForWebview();
 
     // 创建消息处理器
-    const messageHandler = new MessageHandler(this._panel.webview, dataService);
+    const messageHandler = new MessageHandler(this._panel.webview, dataService, extensionUri);
 
     // 监听消息
     this._panel.webview.onDidReceiveMessage(
@@ -95,6 +95,28 @@ export class PluginMarketplacePanel {
       null,
       this._disposables
     );
+  }
+
+  /**
+   * 发送搜索关键词到 Webview
+   * 用于从命令面板触发搜索
+   */
+  public sendSearchTerm(searchTerm: string): void {
+    this._panel.webview.postMessage({
+      type: 'search',
+      payload: { searchTerm }
+    });
+  }
+
+  /**
+   * 显示插件详情
+   * 通知 Webview 切换到详情视图
+   */
+  public showPluginDetails(pluginName: string, marketplace: string): void {
+    this._panel.webview.postMessage({
+      type: 'showDetails',
+      payload: { pluginName, marketplace }
+    });
   }
 
   /**
@@ -140,7 +162,7 @@ export class PluginMarketplacePanel {
 </head>
 <body>
   <div id="root"></div>
-  <script src="${scriptUri}"></script>
+  <script type="module" src="${scriptUri}"></script>
 </body>
 </html>`;
   }
