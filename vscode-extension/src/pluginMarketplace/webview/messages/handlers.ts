@@ -562,25 +562,34 @@ export class MessageHandler {
       return;
     }
 
-    // 动态导入 PluginDetailsPanel
-    const { PluginDetailsPanel } = await import('../PluginDetailsPanel');
+    try {
+      // 动态导入 PluginDetailsPanel
+      const { PluginDetailsPanel } = await import('../PluginDetailsPanel');
 
-    // 检查插件是否已安装
-    const allPlugins = await this.dataService.getAllAvailablePlugins();
-    const plugin = allPlugins.find(p => p.name === pluginName && p.marketplace === marketplace);
-    const isInstalled = plugin?.status.installed || false;
+      // 检查插件是否已安装
+      const allPlugins = await this.dataService.getAllAvailablePlugins();
+      const plugin = allPlugins.find(p => p.name === pluginName && p.marketplace === marketplace);
+      const isInstalled = plugin?.status.installed || false;
 
-    // 获取扩展上下文
-    const context = this.dataService.getContext();
+      // 获取扩展上下文
+      const context = this.dataService.getContext();
+      if (!context) {
+        vscode.window.showErrorMessage('无法打开详情页：缺少扩展上下文');
+        return;
+      }
 
-    // 打开详情面板
-    await PluginDetailsPanel.createOrShow(
-      this.extensionUri,
-      context,
-      pluginName,
-      marketplace,
-      isInstalled
-    );
+      // 打开详情面板
+      await PluginDetailsPanel.createOrShow(
+        this.extensionUri,
+        context,
+        pluginName,
+        marketplace,
+        isInstalled
+      );
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`打开插件详情失败: ${errorMsg}`);
+    }
   }
 
   /**
