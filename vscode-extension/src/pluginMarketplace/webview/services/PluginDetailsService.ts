@@ -148,6 +148,7 @@ export class PluginDetailsService {
   /**
    * 获取插件安装路径
    * 在所有市场目录中搜索插件
+   * 实际路径结构: ~/.claude/plugins/cache/{marketplace}/{pluginName}/{version}/package.json
    */
   public async getPluginPath(pluginName: string): Promise<string | null> {
     const homeDir = process.env.HOME || process.env.USERPROFILE;
@@ -162,29 +163,49 @@ export class PluginDetailsService {
         for (const market of marketplaces) {
           if (!market.isDirectory()) continue;
 
-          // 尝试直接在市场目录下查找插件
-          const pluginPath = path.join(cacheBasePath, market.name, pluginName);
+          const marketPath = path.join(cacheBasePath, market.name);
+
+          // 尝试查找插件目录（可能包含版本号）
           try {
-            await fs.access(pluginPath);
-            return pluginPath;
-          } catch {
-            // 尝试查找版本目录
-            try {
-              const versions = await fs.readdir(path.join(cacheBasePath, market.name));
-              for (const ver of versions) {
-                if (ver === pluginName || ver.startsWith(pluginName + '@')) {
-                  const versionedPath = path.join(cacheBasePath, market.name, ver);
+            const items = await fs.readdir(marketPath, { withFileTypes: true });
+
+            for (const item of items) {
+              if (!item.isDirectory()) continue;
+
+              // 检查是否是目标插件目录（可能带版本号后缀）
+              if (item.name === pluginName || item.name.startsWith(pluginName + '@')) {
+                const pluginDirPath = path.join(marketPath, item.name);
+
+                // 检查此目录是否直接包含 package.json
+                try {
+                  const packageJsonPath = path.join(pluginDirPath, 'package.json');
+                  await fs.access(packageJsonPath);
+                  return pluginDirPath;
+                } catch {
+                  // 如果没有 package.json，尝试查找版本子目录
                   try {
-                    await fs.access(versionedPath);
-                    return versionedPath;
+                    const subItems = await fs.readdir(pluginDirPath, { withFileTypes: true });
+                    for (const subItem of subItems) {
+                      if (!subItem.isDirectory()) continue;
+
+                      const subDirPath = path.join(pluginDirPath, subItem.name);
+                      const subPackageJsonPath = path.join(subDirPath, 'package.json');
+
+                      try {
+                        await fs.access(subPackageJsonPath);
+                        return subDirPath;
+                      } catch {
+                        continue;
+                      }
+                    }
                   } catch {
                     continue;
                   }
                 }
               }
-            } catch {
-              continue;
             }
+          } catch {
+            continue;
           }
         }
       } catch {
