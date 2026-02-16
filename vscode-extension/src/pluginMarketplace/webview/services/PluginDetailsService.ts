@@ -38,7 +38,7 @@ export class PluginDetailsService {
   /**
    * 获取已安装插件的详情（从本地文件读取）
    */
-  private async getInstalledPluginDetail(pluginName: string): Promise<PluginDetailData> {
+  public async getInstalledPluginDetail(pluginName: string): Promise<PluginDetailData> {
     // 获取插件目录
     const pluginPath = await this.getPluginPath(pluginName);
     if (!pluginPath) {
@@ -83,7 +83,7 @@ export class PluginDetailsService {
   /**
    * 获取远程插件的详情（从市场源获取）
    */
-  private async getRemotePluginDetail(
+  public async getRemotePluginDetail(
     pluginName: string,
     marketplace: string
   ): Promise<PluginDetailData> {
@@ -147,37 +147,70 @@ export class PluginDetailsService {
 
   /**
    * 获取插件安装路径
+   * 在所有市场目录中搜索插件
    */
-  private async getPluginPath(pluginName: string): Promise<string | null> {
-    // 尝试用户目录
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-    if (!homeDir) {
-      return null;
-    }
-    const userPluginPath = path.join(homeDir, '.claude', 'plugins', 'cache', 'claude-plugins-official', 'skills', pluginName);
-    try {
-      await fs.access(userPluginPath);
-      return userPluginPath;
-    } catch {
-      // 尝试项目目录
-      const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (workspacePath) {
-        const projectPluginPath = path.join(workspacePath, '.claude', 'plugins', pluginName);
-        try {
-          await fs.access(projectPluginPath);
-          return projectPluginPath;
-        } catch {
-          return null;
+  public async getPluginPath(pluginName: string): Promise<string | null> {
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    const cacheBasePath = path.join(homeDir || '', '.claude', 'plugins', 'cache');
+
+    // 首先尝试从缓存目录搜索
+    if (homeDir) {
+      try {
+        // 列出所有市场目录
+        const marketplaces = await fs.readdir(cacheBasePath, { withFileTypes: true });
+
+        for (const market of marketplaces) {
+          if (!market.isDirectory()) continue;
+
+          // 尝试直接在市场目录下查找插件
+          const pluginPath = path.join(cacheBasePath, market.name, pluginName);
+          try {
+            await fs.access(pluginPath);
+            return pluginPath;
+          } catch {
+            // 尝试查找版本目录
+            try {
+              const versions = await fs.readdir(path.join(cacheBasePath, market.name));
+              for (const ver of versions) {
+                if (ver === pluginName || ver.startsWith(pluginName + '@')) {
+                  const versionedPath = path.join(cacheBasePath, market.name, ver);
+                  try {
+                    await fs.access(versionedPath);
+                    return versionedPath;
+                  } catch {
+                    continue;
+                  }
+                }
+              }
+            } catch {
+              continue;
+            }
+          }
         }
+      } catch {
+        // 忽略错误，继续尝试其他路径
       }
     }
+
+    // 尝试项目目录
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspacePath) {
+      const projectPluginPath = path.join(workspacePath, '.claude', 'plugins', pluginName);
+      try {
+        await fs.access(projectPluginPath);
+        return projectPluginPath;
+      } catch {
+        // 继续尝试
+      }
+    }
+
     return null;
   }
 
   /**
    * 读取 README 文件
    */
-  private async readReadme(pluginPath: string): Promise<string> {
+  public async readReadme(pluginPath: string): Promise<string> {
     const readmeNames = ['README.md', 'readme.md', 'Readme.md'];
     for (const name of readmeNames) {
       const readmePath = path.join(pluginPath, name);
@@ -292,7 +325,7 @@ export class PluginDetailsService {
   /**
    * 解析仓库信息
    */
-  private parseRepository(packageJson: any): RepositoryInfo | undefined {
+  public parseRepository(packageJson: any): RepositoryInfo | undefined {
     const repo = packageJson.repository;
     if (!repo) return undefined;
 
@@ -316,7 +349,7 @@ export class PluginDetailsService {
   /**
    * 解析依赖
    */
-  private parseDependencies(packageJson: any): string[] {
+  public parseDependencies(packageJson: any): string[] {
     const deps = packageJson.dependencies || {};
     return Object.keys(deps);
   }
