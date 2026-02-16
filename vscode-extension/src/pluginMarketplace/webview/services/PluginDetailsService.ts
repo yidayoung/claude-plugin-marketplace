@@ -45,28 +45,27 @@ export class PluginDetailsService {
       throw new Error(`找不到插件 ${pluginName} 的安装目录`);
     }
 
-    // 读取 package.json
-    const packageJsonPath = path.join(pluginPath, 'package.json');
-    const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'));
+    // 查找并读取配置文件（package.json 或 plugin.json）
+    const configJson = await this.readPluginConfig(pluginPath);
 
     // 读取 README
     const readme = await this.readReadme(pluginPath);
 
     // 解析插件内容
-    const skills = this.parseSkills(packageJson);
-    const hooks = this.parseHooks(packageJson);
-    const mcps = this.parseMcps(packageJson);
-    const commands = this.parseCommands(packageJson);
-    const repository = this.parseRepository(packageJson);
-    const dependencies = this.parseDependencies(packageJson);
+    const skills = this.parseSkills(configJson);
+    const hooks = this.parseHooks(configJson);
+    const mcps = this.parseMcps(configJson);
+    const commands = this.parseCommands(configJson);
+    const repository = this.parseRepository(configJson);
+    const dependencies = this.parseDependencies(configJson);
 
     return {
-      name: packageJson.name || pluginName,
-      description: packageJson.description || '',
-      version: packageJson.version || '0.0.0',
-      author: packageJson.author?.name || packageJson.author,
-      homepage: packageJson.homepage,
-      category: packageJson.keywords?.[0],
+      name: configJson.name || pluginName,
+      description: configJson.description || '',
+      version: configJson.version || '0.0.0',
+      author: configJson.author?.name || configJson.author,
+      homepage: configJson.homepage,
+      category: configJson.keywords?.[0],
       marketplace: 'installed',
       installed: true,
       readme,
@@ -76,8 +75,31 @@ export class PluginDetailsService {
       commands,
       repository,
       dependencies,
-      license: packageJson.license
+      license: configJson.license
     };
+  }
+
+  /**
+   * 读取插件配置文件
+   * 支持多种路径: package.json, plugin.json, .claude-plugin/plugin.json
+   */
+  private async readPluginConfig(pluginPath: string): Promise<any> {
+    const configPaths = [
+      path.join(pluginPath, 'package.json'),
+      path.join(pluginPath, 'plugin.json'),
+      path.join(pluginPath, '.claude-plugin', 'plugin.json'),
+    ];
+
+    for (const configPath of configPaths) {
+      try {
+        const content = await fs.readFile(configPath, 'utf-8');
+        return JSON.parse(content);
+      } catch {
+        // 继续尝试下一个
+      }
+    }
+
+    throw new Error(`无法找到插件配置文件 (package.json 或 plugin.json) 在路径: ${pluginPath}`);
   }
 
   /**
@@ -148,7 +170,9 @@ export class PluginDetailsService {
   /**
    * 获取插件安装路径
    * 在所有市场目录中搜索插件
-   * 实际路径结构: ~/.claude/plugins/cache/{marketplace}/{pluginName}/{version}/package.json
+   * 实际路径结构:
+   * - ~/.claude/plugins/cache/{marketplace}/{pluginName}/{version}/.claude-plugin/plugin.json
+   * - 或 ~/.claude/plugins/cache/{marketplace}/{pluginName}/{version}/package.json
    */
   public async getPluginPath(pluginName: string): Promise<string | null> {
     const homeDir = process.env.HOME || process.env.USERPROFILE;
@@ -176,31 +200,51 @@ export class PluginDetailsService {
               if (item.name === pluginName || item.name.startsWith(pluginName + '@')) {
                 const pluginDirPath = path.join(marketPath, item.name);
 
-                // 检查此目录是否直接包含 package.json
-                try {
-                  const packageJsonPath = path.join(pluginDirPath, 'package.json');
-                  await fs.access(packageJsonPath);
-                  return pluginDirPath;
-                } catch {
-                  // 如果没有 package.json，尝试查找版本子目录
+                // 尝试多种可能的配置文件位置
+                const configPaths = [
+                  path.join(pluginDirPath, 'package.json'),
+                  path.join(pluginDirPath, 'plugin.json'),
+                  path.join(pluginDirPath, '.claude-plugin', 'plugin.json'),
+                ];
+
+                for (const configPath of configPaths) {
                   try {
-                    const subItems = await fs.readdir(pluginDirPath, { withFileTypes: true });
-                    for (const subItem of subItems) {
-                      if (!subItem.isDirectory()) continue;
+                    await fs.access(configPath);
+                    // 无论配置文件在哪里，都返回插件目录本身
+                    // 其他方法会根据这个基准路径来查找文件
+                    return pluginDirPath;
+                  } catch {
+                    // 继续尝试下一个
+                  }
+                }
 
-                      const subDirPath = path.join(pluginDirPath, subItem.name);
-                      const subPackageJsonPath = path.join(subDirPath, 'package.json');
+                // 如果没有找到配置文件，尝试查找版本子目录
+                try {
+                  const subItems = await fs.readdir(pluginDirPath, { withFileTypes: true });
+                  for (const subItem of subItems) {
+                    if (!subItem.isDirectory()) continue;
 
+                    const subDirPath = path.join(pluginDirPath, subItem.name);
+
+                    // 检查子目录中的配置文件
+                    const subConfigPaths = [
+                      path.join(subDirPath, 'package.json'),
+                      path.join(subDirPath, 'plugin.json'),
+                      path.join(subDirPath, '.claude-plugin', 'plugin.json'),
+                    ];
+
+                    for (const subConfigPath of subConfigPaths) {
                       try {
-                        await fs.access(subPackageJsonPath);
+                        await fs.access(subConfigPath);
+                        // 找到配置文件，返回版本目录
                         return subDirPath;
                       } catch {
                         continue;
                       }
                     }
-                  } catch {
-                    continue;
                   }
+                } catch {
+                  continue;
                 }
               }
             }
@@ -230,15 +274,24 @@ export class PluginDetailsService {
 
   /**
    * 读取 README 文件
+   * 支持在插件目录或 .claude-plugin 目录中查找
    */
   public async readReadme(pluginPath: string): Promise<string> {
+    const readmeLocations = [
+      pluginPath,
+      path.join(pluginPath, '.claude-plugin'),
+    ];
+
     const readmeNames = ['README.md', 'readme.md', 'Readme.md'];
-    for (const name of readmeNames) {
-      const readmePath = path.join(pluginPath, name);
-      try {
-        return await fs.readFile(readmePath, 'utf-8');
-      } catch {
-        // 继续尝试下一个
+
+    for (const baseLocation of readmeLocations) {
+      for (const name of readmeNames) {
+        const readmePath = path.join(baseLocation, name);
+        try {
+          return await fs.readFile(readmePath, 'utf-8');
+        } catch {
+          // 继续尝试下一个
+        }
       }
     }
     return '';

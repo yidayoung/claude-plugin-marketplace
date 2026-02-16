@@ -1,5 +1,6 @@
 import React from 'react';
-import './FilterBar.css';
+import { Select, Space } from 'antd';
+import { FilterOutlined, AppstoreOutlined } from '@ant-design/icons';
 
 interface FilterBarProps {
   status: string;
@@ -8,37 +9,51 @@ interface FilterBarProps {
   onFilterChange: (status: string, marketplace: string) => void;
 }
 
+const statusOptions = [
+  { label: '全部', value: 'all' },
+  { label: '已安装', value: 'installed' },
+  { label: '未安装', value: 'not-installed' },
+  { label: '可升级', value: 'upgradable' }
+];
+
 const FilterBar: React.FC<FilterBarProps> = ({
   status,
   marketplace,
   marketplaces,
   onFilterChange
 }) => {
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onFilterChange(e.target.value, marketplace);
+  const handleStatusChange = (value: string) => {
+    onFilterChange(value, marketplace);
   };
 
-  const handleMarketplaceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onFilterChange(status, e.target.value);
+  const handleMarketplaceChange = (value: string) => {
+    onFilterChange(status, value);
   };
+
+  const marketplaceOptions = marketplaces.map(mp => ({
+    label: mp === 'all' ? '全部市场' : mp,
+    value: mp
+  }));
 
   return (
-    <div className="filter-bar">
-      <select value={status} onChange={handleStatusChange} className="filter-select">
-        <option value="all">全部</option>
-        <option value="installed">已安装</option>
-        <option value="not-installed">未安装</option>
-        <option value="upgradable">可升级</option>
-      </select>
-
-      <select value={marketplace} onChange={handleMarketplaceChange} className="filter-select">
-        {marketplaces.map(mp => (
-          <option key={mp} value={mp}>
-            {mp === 'all' ? '全部市场' : mp}
-          </option>
-        ))}
-      </select>
-    </div>
+    <Space className="filter-bar-antd">
+      <Select
+        value={status}
+        onChange={handleStatusChange}
+        options={statusOptions}
+        prefix={<FilterOutlined />}
+        style={{ minWidth: 120 }}
+        placeholder="状态筛选"
+      />
+      <Select
+        value={marketplace}
+        onChange={handleMarketplaceChange}
+        options={marketplaceOptions}
+        prefix={<AppstoreOutlined />}
+        style={{ minWidth: 140 }}
+        placeholder="市场筛选"
+      />
+    </Space>
   );
 };
 

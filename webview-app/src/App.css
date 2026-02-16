@@ -1,11 +1,182 @@
-.app {
-  padding: 20px;
+/* ============================================
+   App 布局
+   ============================================ */
+.app-layout {
+  height: 100vh;
+  overflow: hidden;
+  background: var(--vscode-sideBar-background);
 }
 
-h1 {
-  margin-bottom: 10px;
+.app-header {
+  padding: 20px 24px 16px;
+  background: var(--vscode-sideBar-background);
+  border-bottom: 1px solid var(--vscode-widget-border);
 }
 
-p {
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 24px;
+}
+
+.title-section {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.stats {
+  font-size: 13px;
+}
+
+/* Segmented 视图切换器样式 */
+.header-top .ant-segmented {
+  background: var(--vscode-widget-background);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.header-top .ant-segmented-item {
+  border-radius: 8px;
+  padding: 6px 16px;
+  transition: all 0.25s ease;
+}
+
+.header-top .ant-segmented-item-selected {
+  background: var(--vscode-button-background);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 内容区域 */
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  background: transparent;
+}
+
+/* ============================================
+   插件卡片样式
+   ============================================ */
+.plugin-card-modern {
+  border-radius: 12px;
+  margin-bottom: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.plugin-card-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.plugin-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.plugin-card-actions {
+  flex-shrink: 0;
+}
+
+/* Ribbon 徽章 */
+.plugin-card-modern .ant-badge-ribbon {
+  top: 12px;
+  right: 24px;
+  font-size: 11px;
+  padding: 0 8px;
+  height: 22px;
+  line-height: 22px;
+  border-radius: 0 8px 0 8px;
+}
+
+/* 禁用的插件卡片 */
+.plugin-card-disabled {
+  opacity: 0.6;
+}
+
+.plugin-card-disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* ============================================
+   动画效果
+   ============================================ */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.plugin-card-modern {
+  animation: fadeInUp 0.3s ease backwards;
+}
+
+.plugin-card-modern:nth-child(1) { animation-delay: 0.05s; }
+.plugin-card-modern:nth-child(2) { animation-delay: 0.1s; }
+.plugin-card-modern:nth-child(3) { animation-delay: 0.15s; }
+.plugin-card-modern:nth-child(4) { animation-delay: 0.2s; }
+.plugin-card-modern:nth-child(5) { animation-delay: 0.25s; }
+.plugin-card-modern:nth-child(n+6) { animation-delay: 0.3s; }
+
+/* ============================================
+   响应式
+   ============================================ */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 16px;
+  }
+
+  .header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .title-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .header-top .ant-segmented {
+    width: 100%;
+  }
+
+  .app-content {
+    padding: 16px;
+  }
+
+  .plugin-card-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .plugin-card-actions {
+    width: 100%;
+  }
+
+  .plugin-card-actions .ant-dropdown-button {
+    width: 100%;
+  }
+}
+
+/* ============================================
+   空状态
+   ============================================ */
+.ant-empty {
+  padding: 60px 20px;
+}
+
+.ant-empty-description {
   color: var(--vscode-descriptionForeground);
 }
