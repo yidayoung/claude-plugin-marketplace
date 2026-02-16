@@ -11,11 +11,13 @@ export type WebviewMessageType =
   | 'uninstallPlugin'
   | 'enablePlugin'
   | 'disablePlugin'
-  | 'openDetail'
+  | 'updatePlugin'
+  | 'openDetails'
   | 'refresh'
   | 'addMarketplace'
   | 'removeMarketplace'
-  | 'updateMarketplace';
+  | 'updateMarketplace'
+  | 'executeCommand';
 
 /**
  * Extension 发送给 Webview 的消息类型
@@ -32,7 +34,8 @@ export type ExtensionMessageType =
   | 'disableError'
   | 'marketplaceSuccess'
   | 'marketplaceError'
-  | 'error';
+  | 'error'
+  | 'pluginDetail';
 
 /**
  * Webview 消息基础结构
@@ -129,3 +132,103 @@ export interface RemoveMarketplacePayload {
 export interface UpdateMarketplacePayload {
   name: string;
 }
+
+/**
+ * 打开插件详情的消息负载
+ */
+export interface OpenDetailsPayload {
+  pluginName: string;
+  marketplace: string;
+}
+
+/**
+ * 更新插件的消息负载
+ */
+export interface UpdatePluginPayload {
+  pluginName: string;
+  marketplace: string;
+}
+
+/**
+ * 执行命令的消息负载
+ */
+export interface ExecuteCommandPayload {
+  command: string;
+  args?: any[];
+}
+
+/**
+ * 插件详情数据负载
+ */
+export interface PluginDetailPayload {
+  pluginName: string;
+  marketplace: string;
+}
+
+/**
+ * 插件核心内容信息
+ */
+export interface SkillInfo {
+  name: string;
+  description: string;
+  category?: string;
+}
+
+export interface HookInfo {
+  name: string;
+  events: string[];
+  description?: string;
+}
+
+export interface McpInfo {
+  name: string;
+  description?: string;
+}
+
+export interface CommandInfo {
+  name: string;
+  description?: string;
+}
+
+/**
+ * 仓库信息
+ */
+export interface RepositoryInfo {
+  type: 'github' | 'gitlab' | 'other';
+  url: string;
+  stars?: number;
+}
+
+/**
+ * 插件详情数据（扩展 PluginData）
+ */
+export interface PluginDetailData {
+  name: string;
+  description: string;
+  version: string;
+  author?: string;
+  homepage?: string;
+  category?: string;
+  marketplace: string;
+  installed: boolean;
+  enabled?: boolean;
+  scope?: 'user' | 'project' | 'local';
+  updateAvailable?: boolean;
+  // 详情特有字段
+  readme?: string;
+  skills?: SkillInfo[];
+  hooks?: HookInfo[];
+  mcps?: McpInfo[];
+  commands?: CommandInfo[];
+  repository?: RepositoryInfo;
+  dependencies?: string[];
+  license?: string;
+}
+
+/**
+ * 插件详情消息负载
+ */
+export interface PluginDetailMessagePayload {
+  plugin: PluginDetailData;
+}
+
