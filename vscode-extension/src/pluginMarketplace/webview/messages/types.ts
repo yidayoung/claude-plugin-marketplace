@@ -202,18 +202,7 @@ export interface RepositoryInfo {
 /**
  * 插件详情数据（扩展 PluginData）
  */
-export interface PluginDetailData {
-  name: string;
-  description: string;
-  version: string;
-  author?: string;
-  homepage?: string;
-  category?: string;
-  marketplace: string;
-  installed: boolean;
-  enabled?: boolean;
-  scope?: 'user' | 'project' | 'local';
-  updateAvailable?: boolean;
+export interface PluginDetailData extends PluginData {
   // 详情特有字段
   readme?: string;
   skills?: SkillInfo[];
