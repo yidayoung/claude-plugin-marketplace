@@ -117,10 +117,11 @@ export class PluginDetailsPanel {
         type: 'pluginDetail',
         payload: { plugin: detail }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       this.sendMessage({
         type: 'error',
-        payload: { message: `加载插件详情失败: ${error.message}` }
+        payload: { message: `加载插件详情失败: ${errorMsg}` }
       });
     }
   }
@@ -129,27 +130,32 @@ export class PluginDetailsPanel {
    * 处理来自 Webview 的消息
    */
   private async handleMessage(message: any): Promise<void> {
-    switch (message.type) {
-      case 'installPlugin':
-        // 转发到主市场面板处理
-        await vscode.commands.executeCommand('claudePluginMarketplace.install', message.payload);
-        break;
-      case 'uninstallPlugin':
-        await vscode.commands.executeCommand('claudePluginMarketplace.uninstall', message.payload);
-        break;
-      case 'enablePlugin':
-        await vscode.commands.executeCommand('claudePluginMarketplace.enable', message.payload);
-        break;
-      case 'disablePlugin':
-        await vscode.commands.executeCommand('claudePluginMarketplace.disable', message.payload);
-        break;
-      case 'openExternal':
-        vscode.env.openExternal(vscode.Uri.parse(message.payload.url));
-        break;
-      case 'copyToClipboard':
-        await vscode.env.clipboard.writeText(message.payload.text);
-        vscode.window.showInformationMessage('已复制到剪贴板');
-        break;
+    try {
+      switch (message.type) {
+        case 'installPlugin':
+          // 转发到主市场面板处理
+          await vscode.commands.executeCommand('claudePluginMarketplace.install', message.payload);
+          break;
+        case 'uninstallPlugin':
+          await vscode.commands.executeCommand('claudePluginMarketplace.uninstall', message.payload);
+          break;
+        case 'enablePlugin':
+          await vscode.commands.executeCommand('claudePluginMarketplace.enable', message.payload);
+          break;
+        case 'disablePlugin':
+          await vscode.commands.executeCommand('claudePluginMarketplace.disable', message.payload);
+          break;
+        case 'openExternal':
+          vscode.env.openExternal(vscode.Uri.parse(message.payload.url));
+          break;
+        case 'copyToClipboard':
+          await vscode.env.clipboard.writeText(message.payload.text);
+          vscode.window.showInformationMessage('已复制到剪贴板');
+          break;
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`操作失败: ${errorMsg}`);
     }
   }
 
