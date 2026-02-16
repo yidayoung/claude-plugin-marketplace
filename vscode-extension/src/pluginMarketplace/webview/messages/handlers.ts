@@ -9,12 +9,15 @@ import {
   UninstallPluginPayload,
   EnablePluginPayload,
   DisablePluginPayload,
+  UpdatePluginPayload,
   GetPluginsPayload,
   PluginsPayload,
   PluginData,
   AddMarketplacePayload,
   RemoveMarketplacePayload,
-  UpdateMarketplacePayload
+  UpdateMarketplacePayload,
+  OpenDetailsPayload,
+  ExecuteCommandPayload
 } from './types';
 
 /**
@@ -24,7 +27,8 @@ import {
 export class MessageHandler {
   constructor(
     private webview: vscode.Webview,
-    private dataService: PluginDataService
+    private dataService: PluginDataService,
+    private extensionUri: vscode.Uri
   ) {}
 
   /**
@@ -53,6 +57,14 @@ export class MessageHandler {
           await this.handleDisablePlugin(message.payload as DisablePluginPayload);
           break;
 
+        case 'updatePlugin':
+          await this.handleUpdatePlugin(message.payload as UpdatePluginPayload);
+          break;
+
+        case 'openDetails':
+          await this.handleOpenDetails(message.payload as OpenDetailsPayload);
+          break;
+
         case 'addMarketplace':
           await this.handleAddMarketplace(message.payload as AddMarketplacePayload);
           break;
@@ -67,6 +79,10 @@ export class MessageHandler {
 
         case 'refresh':
           await this.handleRefresh();
+          break;
+
+        case 'executeCommand':
+          await this.handleExecuteCommand(message.payload as ExecuteCommandPayload);
           break;
 
         default:
@@ -485,6 +501,94 @@ export class MessageHandler {
         payload: { message: `刷新失败: ${error.message}` }
       });
     }
+  }
+
+  /**
+   * 更新插件
+   * 先卸载再安装最新版本
+   */
+  private async handleUpdatePlugin(payload: UpdatePluginPayload): Promise<void> {
+    const { pluginName, marketplace } = payload;
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `正在更新插件 ${pluginName}...`,
+        cancellable: false
+      },
+      async () => {
+        try {
+          // 先卸载
+          const uninstallResult = await this.dataService.uninstallPlugin(pluginName);
+          if (!uninstallResult.success) {
+            throw new Error(uninstallResult.error || '卸载失败');
+          }
+
+          // 再安装
+          const installResult = await this.dataService.installPlugin(pluginName, marketplace, 'user');
+          if (!installResult.success) {
+            throw new Error(installResult.error || '安装失败');
+          }
+
+          this.sendMessage({
+            type: 'installSuccess',
+            payload: { pluginName, scope: 'user' }
+          });
+
+          vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 更新成功`);
+        } catch (error: any) {
+          const errorMessage = error.message || '未知错误';
+          this.sendMessage({
+            type: 'installError',
+            payload: { pluginName, error: errorMessage }
+          });
+
+          vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 更新失败: ${errorMessage}`);
+          throw error;
+        }
+      }
+    );
+  }
+
+  /**
+   * 打开插件详情页
+   * 创建独立的详情 Panel
+   */
+  private async handleOpenDetails(payload: OpenDetailsPayload): Promise<void> {
+    const { pluginName, marketplace } = payload;
+
+    if (!this.extensionUri) {
+      vscode.window.showErrorMessage('无法打开详情页：缺少扩展 URI');
+      return;
+    }
+
+    // 动态导入 PluginDetailsPanel
+    const { PluginDetailsPanel } = await import('../PluginDetailsPanel');
+
+    // 检查插件是否已安装
+    const allPlugins = await this.dataService.getAllAvailablePlugins();
+    const plugin = allPlugins.find(p => p.name === pluginName && p.marketplace === marketplace);
+    const isInstalled = plugin?.status.installed || false;
+
+    // 获取扩展上下文
+    const context = this.dataService.getContext();
+
+    // 打开详情面板
+    await PluginDetailsPanel.createOrShow(
+      this.extensionUri,
+      context,
+      pluginName,
+      marketplace,
+      isInstalled
+    );
+  }
+
+  /**
+   * 执行 VSCode 命令
+   */
+  private async handleExecuteCommand(payload: ExecuteCommandPayload): Promise<void> {
+    const { command, args } = payload;
+    await vscode.commands.executeCommand(command, ...(args || []));
   }
 
   /**
