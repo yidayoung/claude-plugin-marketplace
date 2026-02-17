@@ -14,7 +14,7 @@
       "env": {
         "VSCODE_DEBUG_MODE": "true"
       },
-      "preLaunchTask": "vscode: watch"
+      "preLaunchTask": "vscode: watch with webview"
     },
     {
       "name": "✅ 生产模式 (快捷键正常)",

@@ -35,6 +35,7 @@ export class MessageHandler {
    * 消息路由 - 根据消息类型分发到具体的处理方法
    */
   async handleMessage(message: WebviewMessage): Promise<void> {
+    console.log('[MessageHandler] Received message:', message.type, message.payload);
     try {
       switch (message.type) {
         case 'getPlugins':
@@ -556,6 +557,7 @@ export class MessageHandler {
    */
   private async handleOpenDetails(payload: OpenDetailsPayload): Promise<void> {
     const { pluginName, marketplace } = payload;
+    console.log(`[MessageHandler] handleOpenDetails called:`, { pluginName, marketplace });
 
     if (!this.extensionUri) {
       vscode.window.showErrorMessage('无法打开详情页：缺少扩展 URI');

@@ -257,6 +257,7 @@ const SidebarApp: React.FC = () => {
   };
 
   const handleOpenDetails = (pluginName: string, marketplace: string) => {
+    console.log('[SidebarApp] Sending openDetails message:', { pluginName, marketplace });
     vscode.postMessage({
       type: 'openDetails',
       payload: { pluginName, marketplace }

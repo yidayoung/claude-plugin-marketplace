@@ -50,6 +50,7 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
     // 监听消息
     webviewView.webview.onDidReceiveMessage(
       async message => {
+        console.log('[SidebarWebviewView] Received message:', message.type, message.payload);
         if (this._messageHandler) {
           await this._messageHandler.handleMessage(message);
         }

@@ -196,28 +196,28 @@ export class PluginDetailsPanel {
     );
 
     // 设置初始状态，告诉 React 这是详情面板
-    const initState = JSON.stringify({
+    // 使用 encodeURIComponent 安全地编码为 URL 参数
+    const initState = encodeURIComponent(JSON.stringify({
       viewType: 'details',
       pluginName: this._pluginName,
       marketplace: this._marketplace
-    });
+    }));
+
+    // 在 scriptUri 后面添加初始状态作为查询参数
+    const scriptUriWithState = `${scriptUri}?init=${initState}`;
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${this._panel.webview.cspSource}; style-src ${this._panel.webview.cspSource} 'unsafe-inline';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${this._panel.webview.cspSource} 'unsafe-inline' 'unsafe-eval'; style-src ${this._panel.webview.cspSource} 'unsafe-inline';">
   <link href="${styleUri}" rel="stylesheet">
   <title>插件详情</title>
 </head>
 <body>
   <div id="root"></div>
-  <script>
-    // 设置初始状态
-    window.vscodeState = ${initState};
-  </script>
-  <script type="module" src="${scriptUri}"></script>
+  <script type="module" src="${scriptUriWithState}"></script>
 </body>
 </html>`;
   }
