@@ -110,15 +110,20 @@ export class PluginDetailsPanel {
     this._marketplace = marketplace;
     this._isInstalled = isInstalled;
 
+    console.log(`[PluginDetailsPanel] Loading details: ${pluginName} from ${marketplace}, installed: ${isInstalled}`);
+
     try {
       const detail = await this._detailService.getPluginDetail(pluginName, marketplace, isInstalled);
+      console.log(`[PluginDetailsPanel] Got detail:`, detail);
       this._panel.title = `插件详情: ${pluginName}`;
       this.sendMessage({
         type: 'pluginDetail',
         payload: { plugin: detail }
       });
+      console.log(`[PluginDetailsPanel] Sent pluginDetail message`);
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[PluginDetailsPanel] Error loading details:`, errorMsg);
       this.sendMessage({
         type: 'error',
         payload: { message: `加载插件详情失败: ${errorMsg}` }

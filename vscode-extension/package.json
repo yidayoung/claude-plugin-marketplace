@@ -33,7 +33,8 @@
     "views": {
       "claude-marketplace-sidebar": [
         {
-          "id": "claudePluginMarketplace",
+          "id": "claudePluginMarketplaceSidebar",
+          "type": "webview",
           "name": "插件市场"
         }
       ]
@@ -41,7 +42,7 @@
     "commands": [
       {
         "command": "claudePluginMarketplace.open",
-        "title": "打开插件市场",
+        "title": "打开插件市场面板",
         "icon": "$(extensions)"
       },
       {
@@ -86,74 +87,13 @@
       {
         "command": "claudePluginMarketplace.disablePlugin",
         "title": "禁用插件"
+      },
+      {
+        "command": "claudePluginMarketplace.searchPlugins",
+        "title": "搜索插件",
+        "icon": "$(search)"
       }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "claudePluginMarketplace.refresh",
-          "when": "view == claudePluginMarketplace",
-          "group": "navigation"
-        },
-        {
-          "command": "claudePluginMarketplace.addMarketplace",
-          "when": "view == claudePluginMarketplace",
-          "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "claudePluginMarketplace.installPlugin",
-          "when": "view == claudePluginMarketplace && viewItem == available-plugin",
-          "group": "inline"
-        },
-        {
-          "command": "claudePluginMarketplace.installPlugin",
-          "when": "view == claudePluginMarketplace && viewItem == available-plugin",
-          "group": "1_pluginActions@1"
-        },
-        {
-          "command": "claudePluginMarketplace.showPluginDetails",
-          "when": "view == claudePluginMarketplace && viewItem == available-plugin",
-          "group": "1_pluginActions@2"
-        },
-        {
-          "command": "claudePluginMarketplace.updatePlugin",
-          "when": "view == claudePluginMarketplace && viewItem == installed-plugin",
-          "group": "inline"
-        },
-        {
-          "command": "claudePluginMarketplace.uninstallPlugin",
-          "when": "view == claudePluginMarketplace && viewItem == installed-plugin",
-          "group": "1_pluginActions@1"
-        },
-        {
-          "command": "claudePluginMarketplace.showPluginDetails",
-          "when": "view == claudePluginMarketplace && viewItem == installed-plugin",
-          "group": "1_pluginActions@2"
-        },
-        {
-          "command": "claudePluginMarketplace.enablePlugin",
-          "when": "view == claudePluginMarketplace && viewItem == installed-disabled",
-          "group": "inline"
-        },
-        {
-          "command": "claudePluginMarketplace.disablePlugin",
-          "when": "view == claudePluginMarketplace && viewItem == installed-enabled",
-          "group": "inline"
-        },
-        {
-          "command": "claudePluginMarketplace.removeMarketplace",
-          "when": "view == claudePluginMarketplace && viewItem == marketplace",
-          "group": "1_marketplaceActions@1"
-        },
-        {
-          "command": "claudePluginMarketplace.refreshMarketplace",
-          "when": "view == claudePluginMarketplace && viewItem == marketplace",
-          "group": "1_marketplaceActions@2"
-        }
-      ]
-    }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

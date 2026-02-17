@@ -104,7 +104,8 @@ export class PluginDataService {
       );
     }
 
-    if (filter.marketplace) {
+    // 只在不是 'all' 时才按市场筛选
+    if (filter.marketplace && filter.marketplace !== 'all') {
       filtered = filtered.filter(plugin => plugin.marketplace === filter.marketplace);
     }
 
@@ -310,6 +311,13 @@ export class PluginDataService {
    */
   clearCache(): void {
     this.cache.invalidate();
+  }
+
+  /**
+   * 获取扩展上下文
+   */
+  getContext(): vscode.ExtensionContext {
+    return this.context;
   }
 
   /**

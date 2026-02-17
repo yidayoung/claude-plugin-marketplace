@@ -1,5 +1,12 @@
 import * as vscode from 'vscode';
-import { execClaudeCommand, Marketplace, Plugin } from './types';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+import { execClaudeCommand, Marketplace, Plugin, MarketplaceConfig, MarketplacePlugin } from './types';
 
 export class MarketplaceManager {
   private context: vscode.ExtensionContext;
@@ -147,31 +154,166 @@ export class MarketplaceManager {
 
   /**
    * 从市场获取插件列表
-   * 注意：当前实现返回已安装的插件列表
-   * TODO: 实现从市场浏览可用插件的功能
+   * 通过读取市场的 marketplace.yaml 文件获取可用插件
    */
   async fetchPlugins(marketplace: Marketplace): Promise<Plugin[]> {
-    try {
-      // MVP 阶段：返回所有已安装的插件（忽略市场来源）
-      // 因为 Claude Code CLI 可能不提供"从特定市场列出所有可用插件"的命令
-      const result = await execClaudeCommand('plugin list --json');
+    const config = await this.loadMarketplaceConfig(marketplace);
+    if (!config || !config.plugins) {
+      return [];
+    }
 
-      if (result.status === 'success' && result.data?.plugins) {
-        return result.data.plugins.map((ip: any) => ({
-          name: ip.name,
-          version: ip.version,
-          description: ip.description || '',
-          author: ip.author || 'Unknown',
-          homepage: ip.homepage,
-          marketplace: marketplace.name,
-          installed: true
-        }));
+    // 转换为 Plugin 格式
+    return config.plugins.map((mp: MarketplacePlugin) => ({
+      name: mp.name,
+      version: mp.version,
+      description: mp.description,
+      author: mp.author?.name || 'Unknown',
+      homepage: mp.homepage,
+      marketplace: marketplace.name,
+      installed: false
+    }));
+  }
+
+  /**
+   * 加载市场配置文件
+   */
+  private async loadMarketplaceConfig(marketplace: Marketplace): Promise<MarketplaceConfig | null> {
+    const marketplacesDir = path.join(this.context.globalStorageUri.fsPath, 'marketplaces');
+    const marketPath = path.join(marketplacesDir, marketplace.name);
+    const configPath = path.join(marketPath, 'marketplace.yaml');
+
+    try {
+      const configContent = await fs.readFile(configPath, 'utf-8');
+      return this.parseYaml(configContent);
+    } catch (error) {
+      // 如果本地文件不存在，尝试刷新市场
+      await this.refreshMarketplace(marketplace);
+      // 重试读取
+      try {
+        const configContent = await fs.readFile(configPath, 'utf-8');
+        return this.parseYaml(configContent);
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  /**
+   * 刷新市场：从远程拉取最新数据
+   */
+  private async refreshMarketplace(marketplace: Marketplace): Promise<void> {
+    try {
+      const marketplacesDir = path.join(this.context.globalStorageUri.fsPath, 'marketplaces');
+      await fs.mkdir(marketplacesDir, { recursive: true });
+
+      const marketPath = path.join(marketplacesDir, marketplace.name);
+
+      // 如果已存在，先更新
+      try {
+        await fs.access(marketPath);
+        await execAsync(`git -C "${marketPath}" pull`, { timeout: 30000 });
+      } catch {
+        // 不存在，克隆
+        const repoUrl = this.getGitUrl(marketplace);
+        await execAsync(`git clone "${repoUrl}" "${marketPath}"`, { timeout: 60000 });
+      }
+    } catch (error) {
+      console.error(`Failed to refresh marketplace ${marketplace.name}:`, error);
+    }
+  }
+
+  /**
+   * 获取市场的 Git URL
+   */
+  private getGitUrl(marketplace: Marketplace): string {
+    if (marketplace.source.startsWith('http://') || marketplace.source.startsWith('https://')) {
+      return marketplace.source;
+    }
+    return marketplace.source;
+  }
+
+  /**
+   * 简单的 YAML 解析器
+   * 由于不想引入 heavy 依赖，这里实现一个简单的解析
+   */
+  private parseYaml(content: string): MarketplaceConfig | null {
+    try {
+      // 简单的 YAML 到 JSON 转换（针对 marketplace.yaml 格式）
+      const lines = content.split('\n');
+      const result: any = {};
+      const plugins: any[] = [];
+      let currentPlugin: any = null;
+      let inPlugins = false;
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+
+        // 跳过注释和空行
+        if (!trimmed || trimmed.startsWith('#')) continue;
+
+        // 解析根级字段
+        const rootMatch = trimmed.match(/^([a-zA-Z_]+):\s*(.*)$/);
+        if (rootMatch && !inPlugins) {
+          const key = rootMatch[1];
+          const value = rootMatch[2].trim();
+
+          if (key === 'plugins') {
+            inPlugins = true;
+            continue;
+          }
+
+          if (value.startsWith('"') || value.startsWith("'")) {
+            result[key] = value.slice(1, -1);
+          } else if (value === 'true' || value === 'false') {
+            result[key] = value === 'true';
+          } else if (!isNaN(Number(value))) {
+            result[key] = Number(value);
+          } else {
+            result[key] = value;
+          }
+          continue;
+        }
+
+        // 解析插件字段
+        if (inPlugins) {
+          const indent = line.search(/\S/);
+          if (indent <= 2) {
+            // 插件结束
+            if (currentPlugin) {
+              plugins.push(currentPlugin);
+              currentPlugin = null;
+            }
+            inPlugins = false;
+          }
+
+          const pluginMatch = trimmed.match(/^([a-zA-Z_]+):\s*(.*)$/);
+          if (pluginMatch) {
+            if (!currentPlugin) {
+              currentPlugin = {};
+            }
+            const key = pluginMatch[1];
+            let value = pluginMatch[2].trim();
+
+            // 处理引用类型
+            if (value.startsWith('"') || value.startsWith("'")) {
+              value = value.slice(1, -1);
+            }
+
+            currentPlugin[key] = value;
+          }
+        }
       }
 
-      return [];
+      // 添加最后一个插件
+      if (currentPlugin) {
+        plugins.push(currentPlugin);
+      }
+
+      result.plugins = plugins;
+      return result;
     } catch (error) {
-      vscode.window.showErrorMessage(`获取市场 ${marketplace.name} 失败: ${error}`);
-      return [];
+      console.error('Failed to parse YAML:', error);
+      return null;
     }
   }
 
