@@ -3,6 +3,8 @@
 import * as vscode from 'vscode';
 import { CacheManager } from './webview/services/CacheManager';
 import { PluginTreeItem, TreeItemType, PluginInfo, InstalledPlugin } from './types';
+import { PluginDataStore } from './data/PluginDataStore';
+import { StoreEvent } from './data/types';
 
 export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<PluginTreeItem | undefined | void>();
@@ -10,11 +12,20 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
 
   // 缓存数据
   private installedPluginsCache: InstalledPlugin[] = [];
+  private disposables: vscode.Disposable[] = [];
 
   constructor(
-    private context: vscode.ExtensionContext
+    private context: vscode.ExtensionContext,
+    private dataStore: PluginDataStore
   ) {
     this.cacheManager = new CacheManager(context);
+
+    // 订阅插件状态变更事件
+    this.disposables.push(
+      dataStore.on(StoreEvent.PluginStatusChange, () => {
+        this.refresh();
+      })
+    );
   }
 
   private cacheManager: CacheManager;
@@ -242,6 +253,12 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
       return allPlugins.find(p => p.name === pluginName && p.marketplace === marketplace) || null;
     } catch {
       return null;
+    }
+  }
+
+  dispose() {
+    for (const d of this.disposables) {
+      d.dispose();
     }
   }
 }
