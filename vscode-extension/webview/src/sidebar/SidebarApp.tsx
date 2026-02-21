@@ -1,5 +1,7 @@
+// vscode-extension/webview/src/sidebar/SidebarApp.tsx
+
 import { useState, useEffect, useMemo } from 'react';
-import { Input, Spin, Empty, Alert, Button, Divider, Typography, ConfigProvider } from 'antd';
+import { Input, Spin, Empty, Alert, Button, Divider, Typography, Space, Flex, Dropdown } from 'antd';
 import {
   SearchOutlined,
   CheckCircleOutlined,
@@ -17,7 +19,6 @@ import {
   AppstoreOutlined
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
-import { Dropdown } from 'antd';
 
 const { Text } = Typography;
 
@@ -78,12 +79,10 @@ const SidebarApp: React.FC = () => {
     loadPlugins();
   }, []);
 
-  // 筛选完全在前端进行，不需要根据 filter 变化重新请求后端
-
   const loadPlugins = () => {
     vscode.postMessage({
       type: 'getPlugins',
-      payload: {} // 不传 filter，获取所有插件
+      payload: {}
     });
   };
 
@@ -110,7 +109,6 @@ const SidebarApp: React.FC = () => {
   const groupedPlugins = useMemo(() => {
     let filtered = [...state.plugins];
 
-    // 关键词过滤
     if (state.filter.keyword) {
       const keyword = state.filter.keyword.toLowerCase();
       filtered = filtered.filter(p =>
@@ -119,7 +117,6 @@ const SidebarApp: React.FC = () => {
       );
     }
 
-    // 状态过滤
     if (state.filter.status === 'installed') {
       filtered = filtered.filter(p => p.installed);
     } else if (state.filter.status === 'not-installed') {
@@ -128,15 +125,12 @@ const SidebarApp: React.FC = () => {
       filtered = filtered.filter(p => p.updateAvailable);
     }
 
-    // 市场过滤
     if (state.filter.marketplace && state.filter.marketplace !== 'all') {
       filtered = filtered.filter(p => p.marketplace === state.filter.marketplace);
     }
 
-    // 分组
     const installed = filtered.filter(p => p.installed);
 
-    // 按市场分组所有插件（包括已安装和未安装）
     const byMarketplace: Record<string, PluginData[]> = {};
     filtered.forEach(p => {
       if (!byMarketplace[p.marketplace]) {
@@ -145,14 +139,12 @@ const SidebarApp: React.FC = () => {
       byMarketplace[p.marketplace].push(p);
     });
 
-    // 排序：已启用 > 已禁用 > 可更新 > 按名称
     installed.sort((a, b) => {
-      // 优先级分数计算
       const getPriority = (p: PluginData) => {
         let score = 0;
         if (p.installed) score += 100;
-        if (p.enabled !== false) score += 50; // 已启用额外加分
-        if (p.updateAvailable) score += 20; // 可更新加分
+        if (p.enabled !== false) score += 50;
+        if (p.updateAvailable) score += 20;
         return score;
       };
 
@@ -160,10 +152,9 @@ const SidebarApp: React.FC = () => {
       const priorityB = getPriority(b);
 
       if (priorityA !== priorityB) {
-        return priorityB - priorityA; // 降序，分数高的在前
+        return priorityB - priorityA;
       }
 
-      // 同优先级按名称字母序
       return a.name.localeCompare(b.name);
     });
 
@@ -257,7 +248,6 @@ const SidebarApp: React.FC = () => {
   };
 
   const handleOpenDetails = (pluginName: string, marketplace: string) => {
-    console.log('[SidebarApp] Sending openDetails message:', { pluginName, marketplace });
     vscode.postMessage({
       type: 'openDetails',
       payload: { pluginName, marketplace }
@@ -269,7 +259,7 @@ const SidebarApp: React.FC = () => {
     const statusIcon = plugin.updateAvailable
       ? <SyncOutlined style={{ color: '#faad14' }} />
       : plugin.enabled === false
-        ? <CloseCircleOutlined style={{ color: '#8c8c8c' }} />
+        ? <CloseCircleOutlined style={{ color: 'var(--vscode-disabledForeground)' }} />
         : <CheckCircleOutlined style={{ color: '#52c41a' }} />;
 
     const getActionMenu = (plugin: PluginData): MenuProps => {
@@ -328,19 +318,50 @@ const SidebarApp: React.FC = () => {
     };
 
     return (
-      <div key={plugin.name} className="sidebar-plugin-item">
-        <div className="plugin-item-main" onClick={() => handleOpenDetails(plugin.name, plugin.marketplace)}>
-          <div className="plugin-item-icon">{statusIcon}</div>
-          <div className="plugin-item-content">
-            <div className="plugin-item-header">
-              <Text strong className="plugin-name">{plugin.name}</Text>
-              <Text type="secondary" className="plugin-version">v{plugin.version}</Text>
-            </div>
-            <Text type="secondary" className="plugin-description" ellipsis>
+      <div
+        key={plugin.name}
+        onClick={() => handleOpenDetails(plugin.name, plugin.marketplace)}
+        style={{
+          marginBottom: 2,
+          padding: '6px 8px',
+          borderRadius: 4,
+          cursor: 'pointer',
+          transition: 'background 0.15s'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'var(--vscode-list-hoverBackground)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+        }}
+      >
+        <Flex align="center" gap={8}>
+          <div style={{ display: 'flex', alignItems: 'center', minWidth: 16 }}>
+            {statusIcon}
+          </div>
+          <Flex vertical gap={2} style={{ flex: 1, minWidth: 0 }}>
+            <Flex align="baseline" gap={6}>
+              <Text strong style={{ fontSize: 13 }}>{plugin.name}</Text>
+              <Text type="secondary" style={{ fontSize: 11 }}>v{plugin.version}</Text>
+            </Flex>
+            <Text type="secondary" ellipsis style={{ fontSize: 11 }}>
               {plugin.description}
             </Text>
-          </div>
-          <div className="plugin-item-actions">
+          </Flex>
+          <div
+            style={{
+              display: 'flex',
+              gap: 2,
+              opacity: 0,
+              transition: 'opacity 0.15s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0';
+            }}
+          >
             {plugin.installed ? (
               <>
                 {plugin.enabled === false && (
@@ -350,6 +371,7 @@ const SidebarApp: React.FC = () => {
                     icon={<PoweroffOutlined />}
                     onClick={(e) => { e.stopPropagation(); handleEnable(plugin.name, plugin.marketplace); }}
                     title="启用"
+                    style={{ padding: '0 4px', minWidth: 'auto' }}
                   />
                 )}
                 {plugin.updateAvailable && (
@@ -359,9 +381,9 @@ const SidebarApp: React.FC = () => {
                     icon={<ReloadOutlined />}
                     onClick={(e) => { e.stopPropagation(); handleUpdate(plugin.name, plugin.marketplace); }}
                     title="更新"
+                    style={{ padding: '0 4px', minWidth: 'auto' }}
                   />
                 )}
-                {/* 设置按钮 - 齿轮图标 */}
                 <Dropdown menu={getActionMenu(plugin)} trigger={['click']}>
                   <Button
                     type="text"
@@ -369,6 +391,7 @@ const SidebarApp: React.FC = () => {
                     icon={<SettingOutlined />}
                     onClick={(e) => e.stopPropagation()}
                     title="更多操作"
+                    style={{ padding: '0 4px', minWidth: 'auto' }}
                   />
                 </Dropdown>
               </>
@@ -379,10 +402,10 @@ const SidebarApp: React.FC = () => {
                   size="small"
                   icon={<PlusOutlined />}
                   onClick={(e) => { e.stopPropagation(); handleInstall(plugin.name, plugin.marketplace); }}
+                  style={{ fontSize: 12 }}
                 >
                   安装
                 </Button>
-                {/* 未安装插件也有设置按钮 */}
                 <Dropdown menu={getActionMenu(plugin)} trigger={['click']}>
                   <Button
                     type="text"
@@ -390,12 +413,13 @@ const SidebarApp: React.FC = () => {
                     icon={<SettingOutlined />}
                     onClick={(e) => e.stopPropagation()}
                     title="更多操作"
+                    style={{ padding: '0 4px', minWidth: 'auto' }}
                   />
                 </Dropdown>
               </>
             )}
           </div>
-        </div>
+        </Flex>
       </div>
     );
   };
@@ -410,32 +434,62 @@ const SidebarApp: React.FC = () => {
   ) => {
     const isExpanded = expandedSections.has(sectionKey);
     return (
-      <div className="sidebar-section">
-        <div
-          className="sidebar-section-header"
+      <Space direction="vertical" size={4} style={{ width: '100%' }}>
+        <Flex
+          align="center"
+          gap={4}
+          style={{
+            padding: '4px 8px',
+            borderRadius: 4,
+            cursor: 'pointer',
+            transition: 'background 0.15s'
+          }}
           onClick={(e) => {
-            // 如果点击的是操作按钮，不切换展开/收起
-            if ((e.target as HTMLElement).closest('.section-actions')) {
+            if ((e.target as HTMLElement).closest('button')) {
               return;
             }
             toggleSection(sectionKey);
           }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--vscode-toolbar-hoverBackground)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
         >
-          <span className="section-icon">
+          <span style={{ display: 'flex', alignItems: 'center', fontSize: 10 }}>
             {isExpanded ? <CaretDownOutlined /> : <CaretUpOutlined />}
           </span>
           <Text strong>{title}</Text>
           <Text type="secondary">({count})</Text>
-          {actions && <div className="section-actions">{actions}</div>}
-        </div>
-        {isExpanded && <div className="sidebar-section-content">{children}</div>}
-      </div>
+          {actions && (
+            <div
+              style={{
+                marginLeft: 'auto',
+                display: 'flex',
+                gap: 2,
+                opacity: 0,
+                transition: 'opacity 0.15s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '1';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '0';
+              }}
+            >
+              {actions}
+            </div>
+          )}
+        </Flex>
+        {isExpanded && <div style={{ paddingLeft: 16 }}>{children}</div>}
+      </Space>
     );
   };
 
   if (state.loading) {
     return (
-      <div className="sidebar-loading">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <Spin size="small" tip="加载中..." />
       </div>
     );
@@ -443,7 +497,7 @@ const SidebarApp: React.FC = () => {
 
   if (state.error) {
     return (
-      <div className="sidebar-error">
+      <div style={{ padding: 8 }}>
         <Alert
           type="error"
           message={state.error}
@@ -453,95 +507,6 @@ const SidebarApp: React.FC = () => {
       </div>
     );
   }
-
-  // 从 VSCode CSS 变量获取主题颜色
-  const getVsCodeColor = (varName: string, fallback: string) => {
-    if (typeof window === 'undefined') return fallback;
-    const style = getComputedStyle(document.body);
-    return style.getPropertyValue(varName).trim() || fallback;
-  };
-
-  // 构建主题 token 配置
-  const themeConfig = {
-    token: {
-      // 主色调
-      colorPrimary: getVsCodeColor('--vscode-button-background', '#007acc'),
-      colorPrimaryHover: getVsCodeColor('--vscode-button-hoverBackground', '#0062a3'),
-      colorText: getVsCodeColor('--vscode-foreground', '#cccccc'),
-      colorTextSecondary: getVsCodeColor('--vscode-descriptionForeground', '#858585'),
-      colorTextTertiary: getVsCodeColor('--vscode-descriptionForeground', '#858585'),
-      colorBgContainer: getVsCodeColor('--vscode-sideBar-background', '#252526'),
-      colorBgElevated: getVsCodeColor('--vscode-dropdown-background', '#3c3c3c'),
-      colorBgLayout: getVsCodeColor('--vscode-sideBar-background', '#252526'),
-      colorBorder: getVsCodeColor('--vscode-widget-border', '#454545'),
-      colorBorderSecondary: getVsCodeColor('--vscode-widget-border', '#454545'),
-      // 输入框
-      colorBgContainerDisabled: getVsCodeColor('--vscode-input-background', '#3c3c3c'),
-      colorTextPlaceholder: getVsCodeColor('--vscode-input-placeholderForeground', '#858585'),
-      // 下拉菜单
-      colorBgSpotlight: getVsCodeColor('--vscode-list-activeSelectionBackground', '#094771'),
-      colorTextLightSolid: getVsCodeColor('--vscode-list-activeSelectionForeground', '#ffffff'),
-      // 选中/悬停
-      colorFillContent: getVsCodeColor('--vscode-list-hoverBackground', '#2a2d2e'),
-      colorFillAlter: getVsCodeColor('--vscode-list-hoverBackground', '#2a2d2e'),
-      // 禁用状态
-      colorTextDisabled: getVsCodeColor('--vscode-disabledForeground', '#858585'),
-      // 错误/警告
-      colorError: getVsCodeColor('--vscode-errorForeground', '#f14c4c'),
-      colorWarning: getVsCodeColor('--vscode-editorWarning-foreground', '#ffa600'),
-      colorSuccess: getVsCodeColor('--vscode-terminal-ansiGreen', '#89d185'),
-      // 字体
-      fontFamily: getVsCodeColor('--vscode-font-family', 'system-ui, -apple-system, sans-serif'),
-      fontSize: 13,
-      borderRadius: 4,
-    },
-    components: {
-      Input: {
-        colorBgContainer: getVsCodeColor('--vscode-input-background', '#3c3c3c'),
-        colorBorder: getVsCodeColor('--vscode-input-border', '#3c3c3c'),
-        colorText: getVsCodeColor('--vscode-input-foreground', '#cccccc'),
-        colorTextPlaceholder: getVsCodeColor('--vscode-input-placeholderForeground', '#858585'),
-        hoverBorderColor: getVsCodeColor('--vscode-focusBorder', '#007acc'),
-        activeBorderColor: getVsCodeColor('--vscode-focusBorder', '#007acc'),
-      },
-      Select: {
-        colorBgContainer: getVsCodeColor('--vscode-input-background', '#3c3c3c'),
-        colorBorder: getVsCodeColor('--vscode-input-border', '#3c3c3c'),
-        colorText: getVsCodeColor('--vscode-input-foreground', '#cccccc'),
-        colorTextPlaceholder: getVsCodeColor('--vscode-input-placeholderForeground', '#858585'),
-        optionSelectedBg: getVsCodeColor('--vscode-list-activeSelectionBackground', '#094771'),
-        optionActiveBg: getVsCodeColor('--vscode-list-hoverBackground', '#2a2d2e'),
-        selectorBg: getVsCodeColor('--vscode-input-background', '#3c3c3c'),
-      },
-      Button: {
-        colorPrimary: getVsCodeColor('--vscode-button-background', '#007acc'),
-        colorPrimaryHover: getVsCodeColor('--vscode-button-hoverBackground', '#0062a3'),
-        defaultBg: 'transparent',
-        defaultColor: getVsCodeColor('--vscode-foreground', '#cccccc'),
-        defaultBorderColor: 'transparent',
-        defaultHoverBg: getVsCodeColor('--vscode-toolbar-hoverBackground', '#2a2d2e'),
-        defaultHoverColor: getVsCodeColor('--vscode-foreground', '#cccccc'),
-        defaultHoverBorderColor: 'transparent',
-      },
-      Dropdown: {
-        colorBgElevated: getVsCodeColor('--vscode-dropdown-background', '#252526'),
-      },
-      Menu: {
-        colorBgContainer: getVsCodeColor('--vscode-menu-background', '#252526'),
-        colorItemBg: 'transparent',
-        colorItemText: getVsCodeColor('--vscode-foreground', '#cccccc'),
-        colorItemBgSelected: getVsCodeColor('--vscode-list-activeSelectionBackground', '#094771'),
-        colorItemTextSelected: getVsCodeColor('--vscode-list-activeSelectionForeground', '#ffffff'),
-        colorItemBgHover: getVsCodeColor('--vscode-list-hoverBackground', '#2a2d2e'),
-        colorItemTextHover: getVsCodeColor('--vscode-foreground', '#cccccc'),
-      },
-      Typography: {
-        colorText: getVsCodeColor('--vscode-foreground', '#cccccc'),
-        colorTextSecondary: getVsCodeColor('--vscode-descriptionForeground', '#858585'),
-        colorTextDescription: getVsCodeColor('--vscode-descriptionForeground', '#858585'),
-      },
-    },
-  };
 
   // 设置菜单项
   const settingsMenuItems: MenuProps['items'] = [
@@ -570,7 +535,6 @@ const SidebarApp: React.FC = () => {
       label: '全部更新',
       icon: <SyncOutlined />,
       onClick: () => {
-        // 更新所有可更新的插件
         state.plugins.filter(p => p.updateAvailable).forEach(p => {
           vscode.postMessage({
             type: 'updatePlugin',
@@ -582,10 +546,10 @@ const SidebarApp: React.FC = () => {
   ];
 
   return (
-    <ConfigProvider theme={themeConfig}>
-      <div className="sidebar-app">
+    <>
+      <Flex vertical style={{ height: '100%', overflow: 'hidden' }}>
         {/* 搜索栏 + 设置按钮 */}
-        <div className="sidebar-search-bar">
+        <Flex align="center" gap={4} style={{ padding: '6px 8px' }}>
           <Input
             placeholder="搜索插件..."
             value={state.filter.keyword}
@@ -593,37 +557,37 @@ const SidebarApp: React.FC = () => {
             prefix={<SearchOutlined />}
             allowClear
             size="small"
-            className="sidebar-search-compact"
+            style={{ flex: 1 }}
           />
           <Dropdown menu={{ items: settingsMenuItems }} trigger={['click']} placement="bottomRight">
             <Button
               type="text"
               size="small"
               icon={<MoreOutlined />}
-              className="sidebar-settings-btn"
               title="更多操作"
+              style={{ width: 28, height: 28, padding: 0 }}
             />
           </Dropdown>
-        </div>
+        </Flex>
 
         {/* 统计信息 */}
-        <div className="sidebar-stats">
-          <Text type="secondary" style={{ fontSize: 12 }}>
+        <Flex justify="space-between" style={{ padding: '0 8px' }}>
+          <Text type="secondary" style={{ fontSize: 11 }}>
             <CheckCircleOutlined style={{ marginRight: 4 }} />
             已安装 {stats.installed} / 启用 {stats.enabled}
           </Text>
           {stats.updatable > 0 && (
-            <Text style={{ fontSize: 12, color: '#faad14' }}>
+            <Text style={{ fontSize: 11, color: '#faad14' }}>
               <SyncOutlined style={{ marginRight: 4 }} />
               {stats.updatable} 个可更新
             </Text>
           )}
-        </div>
+        </Flex>
 
         <Divider style={{ margin: '8px 0' }} />
 
         {/* 插件列表 */}
-        <div className="sidebar-content">
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
           {groupedPlugins.installed.length === 0 && Object.keys(groupedPlugins.byMarketplace).length === 0 ? (
             <Empty
               description={state.filter.keyword ? '没有找到匹配的插件' : '暂无插件'}
@@ -640,7 +604,6 @@ const SidebarApp: React.FC = () => {
 
               {Object.keys(groupedPlugins.byMarketplace).map(marketName => {
                 const plugins = groupedPlugins.byMarketplace[marketName];
-                // 市场操作按钮
                 const marketActions = (
                   <>
                     <Button
@@ -655,7 +618,7 @@ const SidebarApp: React.FC = () => {
                         });
                       }}
                       title="刷新市场"
-                      style={{ padding: '0 4px' }}
+                      style={{ padding: '0 4px', minWidth: 20 }}
                     />
                     <Button
                       type="text"
@@ -670,7 +633,7 @@ const SidebarApp: React.FC = () => {
                       }}
                       title="删除市场"
                       danger
-                      style={{ padding: '0 4px' }}
+                      style={{ padding: '0 4px', minWidth: 20 }}
                     />
                   </>
                 );
@@ -685,8 +648,8 @@ const SidebarApp: React.FC = () => {
             </>
           )}
         </div>
-      </div>
-    </ConfigProvider>
+      </Flex>
+    </>
   );
 };
 

@@ -1,12 +1,15 @@
-// webview-app/src/details/DetailsApp.tsx
+// vscode-extension/webview/src/details/DetailsApp.tsx
 
 import React, { useState, useEffect } from 'react';
 import { Spin, Alert, Button } from 'antd';
 import { ReloadOutlined, LoadingOutlined } from '@ant-design/icons';
-import vscode from '../main';
 import DetailHeader from './DetailHeader';
 import DetailContent from './DetailContent';
-import '../details/details.css';
+
+// 从 window 获取 vscode API（由 details/main.tsx 注入）
+declare const vscode: {
+  postMessage: (message: any) => void;
+};
 
 // 本地类型定义
 export interface PluginDetailData {
@@ -23,9 +26,12 @@ export interface PluginDetailData {
   updateAvailable?: boolean;
   readme?: string;
   skills?: SkillInfo[];
+  agents?: AgentInfo[];
   hooks?: HookInfo[];
   mcps?: McpInfo[];
   commands?: CommandInfo[];
+  lsps?: LspInfo[];
+  outputStyles?: OutputStyleInfo[];
   repository?: RepositoryInfo;
   dependencies?: string[];
   license?: string;
@@ -33,24 +39,48 @@ export interface PluginDetailData {
 
 export interface SkillInfo {
   name: string;
-  description: string;
-  category?: string;
+  description?: string;
+  filePath?: string;
+}
+
+export interface AgentInfo {
+  name: string;
+  description?: string;
+  filePath?: string;
 }
 
 export interface HookInfo {
-  name: string;
-  events: string[];
-  description?: string;
+  event: string;
+  filePath?: string;
+  hooks: HookConfig[];
+}
+
+export interface HookConfig {
+  type: string;
+  matcher?: string;
+  command?: string;
+  skill?: string;
 }
 
 export interface McpInfo {
   name: string;
-  description?: string;
+  filePath?: string;
+}
+
+export interface LspInfo {
+  language: string;
+  filePath?: string;
 }
 
 export interface CommandInfo {
   name: string;
   description?: string;
+  filePath?: string;
+}
+
+export interface OutputStyleInfo {
+  name: string;
+  filePath?: string;
 }
 
 export interface RepositoryInfo {
@@ -63,26 +93,52 @@ const DetailsApp: React.FC = () => {
   const [plugin, setPlugin] = useState<PluginDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [messageReceived, setMessageReceived] = useState(false);
+  const [readyNotified, setReadyNotified] = useState(false);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const message = event.data;
+      console.log('[DetailsApp] Received message:', message.type);
       switch (message.type) {
         case 'pluginDetail':
+          console.log('[DetailsApp] Plugin detail data:', message.payload);
           setPlugin(message.payload.plugin);
           setLoading(false);
           setError(null);
+          setMessageReceived(true);
           break;
         case 'error':
           setError(message.payload.message);
           setLoading(false);
+          setMessageReceived(true);
           break;
       }
     };
 
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
+
+    // 通知扩展侧 webview 已准备好接收数据
+    if (!readyNotified) {
+      console.log('[DetailsApp] Sending ready message to extension');
+      vscode.postMessage({ type: 'ready' });
+      setReadyNotified(true);
+    }
+
+    // 添加超时处理：如果 30 秒后还没收到消息，显示错误
+    const timeoutId = setTimeout(() => {
+      if (!messageReceived) {
+        console.error('[DetailsApp] Timeout waiting for plugin data');
+        setError('加载插件详情超时，请重试');
+        setLoading(false);
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      clearTimeout(timeoutId);
+    };
+  }, [readyNotified]);
 
   const handleInstall = (scope: 'user' | 'project') => {
     if (!plugin) return;
@@ -134,6 +190,13 @@ const DetailsApp: React.FC = () => {
     });
   };
 
+  const handleOpenFile = (filePath: string) => {
+    vscode.postMessage({
+      type: 'openFile',
+      payload: { filePath }
+    });
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -168,7 +231,7 @@ const DetailsApp: React.FC = () => {
   }
 
   return (
-    <div className="details-app">
+    <div style={{ padding: 20, maxWidth: 1200, margin: '0 auto' }}>
       <DetailHeader
         plugin={plugin}
         onInstall={handleInstall}
@@ -178,7 +241,7 @@ const DetailsApp: React.FC = () => {
         onOpenExternal={handleOpenExternal}
         onCopy={handleCopy}
       />
-      <DetailContent plugin={plugin} />
+      <DetailContent plugin={plugin} onOpenFile={handleOpenFile} />
     </div>
   );
 };

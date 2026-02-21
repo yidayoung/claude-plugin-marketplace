@@ -1,7 +1,7 @@
-// webview-app/src/details/DetailHeader.tsx
+// vscode-extension/webview/src/details/DetailHeader.tsx
 
 import React from 'react';
-import { Space, Tag, Button, Dropdown, Tooltip, Typography, Divider } from 'antd';
+import { Space, Tag, Button, Dropdown, Tooltip, Typography, Divider, Flex, Switch } from 'antd';
 import {
   DeleteOutlined,
   DownloadOutlined,
@@ -12,7 +12,6 @@ import {
   CopyOutlined,
   CheckCircleFilled,
   StopOutlined,
-  PoweroffOutlined,
   StarFilled
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
@@ -68,8 +67,8 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
   };
 
   return (
-    <div className="detail-header">
-      <div className="detail-header-top">
+    <div style={{ marginBottom: 24 }}>
+      <Flex justify="space-between" align="flex-start" gap={16} style={{ marginBottom: 12 }}>
         <Space direction="vertical" size={4} style={{ flex: 1 }}>
           <Space size="middle">
             <Title level={3} style={{ margin: 0 }}>
@@ -83,7 +82,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
             )}
             {isDisabled && (
               <Tooltip title="已禁用">
-                <StopOutlined style={{ color: 'var(--vscode-descriptionForeground)', fontSize: 16 }} />
+                <StopOutlined style={{ fontSize: 16 }} />
               </Tooltip>
             )}
           </Space>
@@ -120,15 +119,12 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
 
           {plugin.installed ? (
             <Space size="small">
-              <Tooltip title={isDisabled ? '启用' : '禁用'}>
-                <Button
-                  type={isDisabled ? 'primary' : 'default'}
+              <Tooltip title={isDisabled ? '启用插件' : '禁用插件'}>
+                <Switch
+                  checked={!isDisabled}
+                  onChange={(checked) => (checked ? onEnable() : onDisable())}
                   size="small"
-                  icon={<PoweroffOutlined />}
-                  onClick={isDisabled ? onEnable : onDisable}
-                >
-                  {isDisabled ? '启用' : '禁用'}
-                </Button>
+                />
               </Tooltip>
               {scopeInfo && (
                 <Tag
@@ -154,7 +150,6 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
               </Tooltip>
               <Tooltip title="卸载">
                 <Button
-                  danger
                   type="text"
                   size="small"
                   icon={<DeleteOutlined />}
@@ -174,7 +169,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
             </Dropdown.Button>
           )}
         </Space>
-      </div>
+      </Flex>
 
       <Divider style={{ margin: '12px 0' }} />
     </div>
