@@ -1,7 +1,6 @@
 // vscode-extension/src/pluginMarketplace/pluginTreeProvider.ts
 
 import * as vscode from 'vscode';
-import { CacheManager } from './webview/services/CacheManager';
 import { PluginTreeItem, TreeItemType, PluginInfo, InstalledPlugin } from './types';
 import { PluginDataStore } from './data/PluginDataStore';
 import { StoreEvent } from './data/types';
@@ -18,8 +17,6 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
     private context: vscode.ExtensionContext,
     private dataStore: PluginDataStore
   ) {
-    this.cacheManager = new CacheManager(context);
-
     // 订阅插件状态变更事件
     this.disposables.push(
       dataStore.on(StoreEvent.PluginStatusChange, () => {
@@ -28,11 +25,7 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
     );
   }
 
-  private cacheManager: CacheManager;
-
   refresh(): void {
-    // 清除缓存
-    this.cacheManager.invalidate();
     this._onDidChangeTreeData.fire();
   }
 
@@ -76,11 +69,19 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
     const items: PluginTreeItem[] = [];
 
     try {
-      // 获取已安装插件和市场列表
-      const [installed, marketplaces] = await Promise.all([
-        this.cacheManager.getInstalledPlugins(),
-        this.cacheManager.getMarketplaces()
-      ]);
+      // 使用 PluginDataStore 获取数据
+      const marketplaces = this.dataStore.getMarketplaces();
+      const allPlugins = this.dataStore.getPluginList();
+
+      // 筛选已安装插件
+      const installed = allPlugins.filter(p => p.installed).map(p => ({
+        name: p.name,
+        version: p.version,
+        enabled: p.enabled ?? true,
+        scope: p.scope,
+        marketplace: p.marketplace,
+        installPath: '' // TreeProvider 不需要路径
+      } as InstalledPlugin));
 
       this.installedPluginsCache = installed;
 
@@ -124,11 +125,10 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
     const items: PluginTreeItem[] = [];
 
     try {
-      const allPlugins = await this.cacheManager.getAllPlugins();
-      const marketplacePlugins = allPlugins.filter(p => p.marketplace === marketplaceName);
+      const marketplacePlugins = this.dataStore.getPluginList(marketplaceName);
 
-      const installed = marketplacePlugins.filter(p => p.status.installed);
-      const available = marketplacePlugins.filter(p => !p.status.installed);
+      const installed = marketplacePlugins.filter(p => p.installed);
+      const available = marketplacePlugins.filter(p => !p.installed);
 
       // 已安装分组
       if (installed.length > 0) {
@@ -191,24 +191,23 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
    */
   private async getSectionInstalledItems(marketplaceName: string): Promise<PluginTreeItem[]> {
     try {
-      const allPlugins = await this.cacheManager.getAllPlugins();
-      const marketplacePlugins = allPlugins.filter(
-        p => p.marketplace === marketplaceName && p.status.installed
-      );
+      const marketplacePlugins = this.dataStore.getPluginList(marketplaceName);
 
-      return marketplacePlugins.map(plugin => {
-        const item = new PluginTreeItem(
-          'installed-plugin',
-          plugin.name,
-          vscode.TreeItemCollapsibleState.None,
-          { ...plugin, marketplaceName }
-        );
+      return marketplacePlugins
+        .filter(p => p.installed)
+        .map(plugin => {
+          const item = new PluginTreeItem(
+            'installed-plugin',
+            plugin.name,
+            vscode.TreeItemCollapsibleState.None,
+            { ...plugin, marketplaceName }
+          );
 
-        item.description = `v${plugin.status.version}`;
-        item.contextValue = plugin.status.enabled ? 'installed-enabled' : 'installed-disabled';
+          item.description = `v${plugin.version}`;
+          item.contextValue = plugin.enabled ? 'installed-enabled' : 'installed-disabled';
 
-        return item;
-      });
+          return item;
+        });
     } catch (error) {
       console.error(`Failed to get installed items for ${marketplaceName}:`, error);
       return [];
@@ -220,24 +219,23 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
    */
   private async getAvailablePluginsItems(marketplaceName: string): Promise<PluginTreeItem[]> {
     try {
-      const allPlugins = await this.cacheManager.getAllPlugins();
-      const marketplacePlugins = allPlugins.filter(
-        p => p.marketplace === marketplaceName && !p.status.installed
-      );
+      const marketplacePlugins = this.dataStore.getPluginList(marketplaceName);
 
-      return marketplacePlugins.map(plugin => {
-        const item = new PluginTreeItem(
-          'available-plugin',
-          plugin.name,
-          vscode.TreeItemCollapsibleState.None,
-          { ...plugin, marketplaceName }
-        );
+      return marketplacePlugins
+        .filter(p => !p.installed)
+        .map(plugin => {
+          const item = new PluginTreeItem(
+            'available-plugin',
+            plugin.name,
+            vscode.TreeItemCollapsibleState.None,
+            { ...plugin, marketplaceName }
+          );
 
-        item.description = plugin.version ? `v${plugin.version}` : '';
-        item.contextValue = 'available-plugin';
+          item.description = plugin.version ? `v${plugin.version}` : '';
+          item.contextValue = 'available-plugin';
 
-        return item;
-      });
+          return item;
+        });
     } catch (error) {
       console.error(`Failed to get available plugins for ${marketplaceName}:`, error);
       return [];
@@ -249,8 +247,26 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
    */
   async getPluginDetails(pluginName: string, marketplace: string): Promise<PluginInfo | null> {
     try {
-      const allPlugins = await this.cacheManager.getAllPlugins();
-      return allPlugins.find(p => p.name === pluginName && p.marketplace === marketplace) || null;
+      const allPlugins = this.dataStore.getPluginList(marketplace);
+      const plugin = allPlugins.find(p => p.name === pluginName);
+      if (!plugin) return null;
+
+      // 转换为旧类型格式（兼容性）
+      return {
+        name: plugin.name,
+        description: plugin.description,
+        version: plugin.version,
+        author: plugin.author ? { name: plugin.author } : undefined,
+        homepage: plugin.homepage,
+        category: plugin.category,
+        marketplace: plugin.marketplace,
+        status: {
+          installed: plugin.installed,
+          enabled: plugin.enabled ?? true,
+          version: plugin.version
+        },
+        source: '' as any // 兼容旧类型
+      } as PluginInfo;
     } catch {
       return null;
     }
