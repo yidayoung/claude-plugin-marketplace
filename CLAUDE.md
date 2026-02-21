@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a VS Code extension for managing Claude Code plugin marketplace. It has two parts:
 
 - `vscode-extension/` - VS Code extension (TypeScript)
-- `webview-app/` - React webview UI (Vite + React)
+- `vscode-extension/webview/` - React webview UI (Vite + React + Ant Design)
 
 ## Build Commands
 
@@ -16,10 +16,15 @@ This is a VS Code extension for managing Claude Code plugin marketplace. It has 
 - `npm run watch` - Watch mode for development
 
 ### Webview
-- `cd vscode-extension && npm run build-webview` - Build React app to `vscode-extension/webview/dist/`
+- `npm run build-webview` - Build React app to `vscode-extension/webview/dist/`
 
 ### Full Build
 - Use VS Code task "vscode: 全部构建" or run: `npm run compile && npm run build-webview`
+
+### Testing
+- `npm test` - Run Jest tests
+- `npm run test:watch` - Watch mode
+- `npm run test:coverage` - Coverage report
 
 ### Debug
 - Press F5 with "🔴 开发模式 (Webview热更新)" configuration
@@ -46,7 +51,7 @@ All plugin operations use `execClaudeCommand()` from [types.ts](vscode-extension
 
 ## Key Conventions
 
-1. **Always rebuild webview after editing** `webview-app/src/` files
+1. **Always rebuild webview after editing** `webview/src/` files
 2. **Extension entry point**: [extension.ts](vscode-extension/src/extension.ts)
 3. **Tree item types** are defined in [types.ts](vscode-extension/src/pluginMarketplace/types.ts) as `TreeItemType`
 4. **CLI commands** are wrapped in `execClaudeCommand()` with timeout handling
@@ -103,18 +108,86 @@ import './MyComponent.css'
 #### 例外情况
 
 以下情况可以创建 CSS 文件：
+- Markdown 渲染样式（React Markdown 内容）
 - 复杂的动画效果
-- 需要多处复用的样式模式
 - 第三方组件的深度样式覆盖（无法通过主题配置）
 
 #### 当前 CSS 文件结构
 
 ```
-webview-app/src/
+vscode-extension/webview/src/
 ├── index.css      # 全局基础样式（滚动条、选择文本、可访问性）
-├── App.css        # 主应用布局、动画、必要的组件样式
-└── sidebar/
-    └── sidebar.css # 侧边栏专用样式（VS Code 主题适配）
+└── theme/
+    └── antd-theme.ts  # Ant Design 主题配置（VS Code 变量映射）
 ```
 
 **不要创建新的 CSS 文件，除非有充分理由。**
+
+---
+
+## Recommended Automations
+
+This project uses TypeScript, React, Ant Design, and Jest. Here are the recommended Claude Code automations:
+
+### 🪝 Hooks
+
+#### Auto-compile on TypeScript changes
+**Why**: Automatically compile extension after edits to catch type errors early
+**Where**: `.claude/settings.json`
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "pattern": "**/*.ts",
+        "command": "npm run compile",
+        "allowedTools": ["Bash(npm run compile)"]
+      }
+    ]
+  }
+}
+```
+
+#### Build webview on React changes
+**Why**: Automatically rebuild webview after editing React components
+**Where**: `.claude/settings.json`
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "pattern": "webview/src/**/*.{ts,tsx}",
+        "command": "npm run build-webview",
+        "allowedTools": ["Bash(npm run build-webview)"]
+      }
+    ]
+  }
+}
+```
+
+#### Run tests on changes
+**Why**: Run relevant tests after editing source files
+**Where**: `.claude/settings.json`
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "pattern": "src/**/*.ts",
+        "command": "npm test -- --testPathPattern=${file%.test}",
+        "allowedTools": ["Bash(npm test:*)"]
+      }
+    ]
+  }
+}
+```
+
+### 🔌 MCP Servers
+
+#### Context7
+**Why**: Quick lookup for React, Ant Design, and VS Code API documentation
+**Install**: `claude mcp add context7`
+
+---
+
+**Want more automations?** Ask for specific categories (e.g., "show me more skills" or "what other hooks would help?").

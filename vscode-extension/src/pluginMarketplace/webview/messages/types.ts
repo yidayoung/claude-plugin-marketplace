@@ -15,6 +15,7 @@ export type WebviewMessageType =
   | 'openDetails'
   | 'openExternal'
   | 'copyToClipboard'
+  | 'openFile'
   | 'refresh'
   | 'addMarketplace'
   | 'removeMarketplace'
@@ -160,6 +161,13 @@ export interface ExecuteCommandPayload {
 }
 
 /**
+ * 打开文件的消息负载
+ */
+export interface OpenFilePayload {
+  filePath: string;
+}
+
+/**
  * 插件详情数据负载
  */
 export interface PluginDetailPayload {
@@ -170,26 +178,96 @@ export interface PluginDetailPayload {
 /**
  * 插件核心内容信息
  */
+
+/**
+ * Skill 信息（Agent Skills）
+ * 来源: skills 目录下的 SKILL.md 文件
+ */
 export interface SkillInfo {
   name: string;
   description: string;
   category?: string;
+  tools?: string[];
+  allowedTools?: string[];
+  disableModelInvocation?: boolean;
+  filePath?: string;  // SKILL.md 文件的绝对路径
 }
 
-export interface HookInfo {
+/**
+ * Agent 信息（Subagents）
+ * 来源: agents/*.md
+ */
+export interface AgentInfo {
   name: string;
-  events: string[];
-  description?: string;
+  description: string;
+  model?: string;
+  category?: string;
+  filePath?: string;  // agent.md 文件的绝对路径
 }
 
+/**
+ * Hook 信息
+ * 来源: hooks/hooks.json
+ */
+export interface HookInfo {
+  event: string;
+  hooks: HookConfig[];
+  filePath?: string;  // hooks.json 文件的绝对路径
+}
+
+export interface HookConfig {
+  type: string;
+  matcher?: string;
+  command?: string;
+  skill?: string;
+  async?: boolean;
+}
+
+/**
+ * MCP Server 信息
+ * 来源: .mcp.json
+ */
 export interface McpInfo {
   name: string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
   description?: string;
+  type?: string;  // "stdio" | "http" 等
+  url?: string;   // HTTP MCP 服务器的 URL
+  filePath?: string;  // .mcp.json 文件的绝对路径
 }
 
+/**
+ * LSP Server 信息
+ * 来源: .lsp.json
+ */
+export interface LspInfo {
+  language: string;
+  command: string;
+  args?: string[];
+  extensionToLanguage?: Record<string, string>;
+  filePath?: string;  // .lsp.json 文件的绝对路径
+}
+
+/**
+ * Command 信息（User Commands）
+ * 来源: commands/*.md
+ */
 export interface CommandInfo {
   name: string;
   description?: string;
+  filePath?: string;  // command.md 文件的绝对路径
+}
+
+/**
+ * Output Style 信息
+ * 来源: outputStyles/ 目录或 plugin.json 的 outputStyles 字段
+ */
+export interface OutputStyleInfo {
+  name: string;
+  type?: 'file' | 'directory';
+  filePath?: string;  // output style 文件/目录的绝对路径
 }
 
 /**
@@ -208,9 +286,12 @@ export interface PluginDetailData extends PluginData {
   // 详情特有字段
   readme?: string;
   skills?: SkillInfo[];
+  agents?: AgentInfo[];
   hooks?: HookInfo[];
   mcps?: McpInfo[];
   commands?: CommandInfo[];
+  lsps?: LspInfo[];
+  outputStyles?: OutputStyleInfo[];
   repository?: RepositoryInfo;
   dependencies?: string[];
   license?: string;

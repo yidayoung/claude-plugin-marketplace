@@ -112,14 +112,18 @@ export class MessageHandler {
 
       // 获取已安装插件列表
       const installedPlugins = await this.dataService.getInstalledPlugins();
-      const installedNames = new Set(installedPlugins.map(ip => ip.name));
+      // 使用组合键 "name@marketplace" 来精确匹配安装状态
+      const installedKeys = new Set(
+        installedPlugins.map(ip => `${ip.name}@${ip.marketplace}`)
+      );
 
       // 更新所有插件的安装状态
       const pluginsWithStatus = await Promise.all(
         allPlugins.map(async (plugin) => {
-          if (installedNames.has(plugin.name)) {
-            // 已安装，获取详细状态
-            const status = await this.dataService.getPluginStatus(plugin.name);
+          const pluginKey = `${plugin.name}@${plugin.marketplace}`;
+          if (installedKeys.has(pluginKey)) {
+            // 已安装，获取详细状态（传入 marketplace 以精确匹配）
+            const status = await this.dataService.getPluginStatus(plugin.name, plugin.marketplace);
             return {
               ...plugin,
               status

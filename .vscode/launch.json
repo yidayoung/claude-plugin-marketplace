@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "🔴 开发模式 (Webview热更新)",
+      "name": "🔴 开发模式",
       "type": "extensionHost",
       "request": "launch",
       "args": [
@@ -11,13 +11,10 @@
       "outFiles": [
         "${workspaceFolder}/vscode-extension/out/**/*.js"
       ],
-      "env": {
-        "VSCODE_DEBUG_MODE": "true"
-      },
       "preLaunchTask": "vscode: watch with webview"
     },
     {
-      "name": "✅ 生产模式 (快捷键正常)",
+      "name": "✅ 生产模式",
       "type": "extensionHost",
       "request": "launch",
       "args": [
@@ -29,13 +26,17 @@
       "preLaunchTask": "vscode: 全部构建"
     },
     {
-      "name": "🌐 Vite Dev Server",
+      "name": "🌐 Webview 开发服务器",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "cwd": "${workspaceFolder}/vscode-extension/webview",
-      "console": "integratedTerminal"
-    },
+      "runtimeArgs": ["run", "dev-webview"],
+      "cwd": "${workspaceFolder}/vscode-extension",
+      "console": "integratedTerminal",
+      "presentation": {
+        "hidden": false,
+        "group": "webview"
+      }
+    }
   ]
 }

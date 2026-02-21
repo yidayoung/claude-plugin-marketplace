@@ -2,6 +2,7 @@
 
 import * as vscode from 'vscode';
 import { PluginDetailsService } from './services/PluginDetailsService';
+import { OpenFilePayload } from './messages/types';
 
 /**
  * 插件详情 Webview Panel 管理器
@@ -15,6 +16,7 @@ export class PluginDetailsPanel {
   private readonly _extensionUri: vscode.Uri;
   private readonly _detailService: PluginDetailsService;
   private _disposables: vscode.Disposable[] = [];
+  private _webviewReady = false; // 跟踪 webview 是否已准备好
 
   /**
    * 创建或显示 PluginDetails Panel
@@ -94,8 +96,8 @@ export class PluginDetailsPanel {
       this._disposables
     );
 
-    // 加载插件详情
-    this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled);
+    // 注意：不再在构造函数中立即加载插件详情
+    // 而是等待 webview 发送 ready 消息后再加载
   }
 
   /**
@@ -137,6 +139,12 @@ export class PluginDetailsPanel {
   private async handleMessage(message: any): Promise<void> {
     try {
       switch (message.type) {
+        case 'ready':
+          // Webview 已准备好，现在加载插件详情
+          console.log('[PluginDetailsPanel] Webview is ready, loading plugin details');
+          this._webviewReady = true;
+          await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled);
+          break;
         case 'installPlugin':
           // 转发到主市场面板处理
           await vscode.commands.executeCommand('claudePluginMarketplace.install', message.payload);
@@ -152,6 +160,13 @@ export class PluginDetailsPanel {
           break;
         case 'openExternal':
           vscode.env.openExternal(vscode.Uri.parse(message.payload.url));
+          break;
+        case 'openFile':
+          // 打开文件并显示在编辑器中
+          const filePath = message.payload.filePath;
+          const fileUri = vscode.Uri.file(filePath);
+          const doc = await vscode.workspace.openTextDocument(fileUri);
+          await vscode.window.showTextDocument(doc);
           break;
         case 'copyToClipboard':
           await vscode.env.clipboard.writeText(message.payload.text);
@@ -188,11 +203,12 @@ export class PluginDetailsPanel {
    */
   private _getHtmlForWebview(): string {
     const scriptUri = this._panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'webview.js')
+      vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'details.js')
     );
 
+    // 现在每个入口点都有独立的 CSS 文件
     const styleUri = this._panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'webview.css')
+      vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'details.css')
     );
 
     // 设置初始状态，告诉 React 这是详情面板

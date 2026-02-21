@@ -66,8 +66,10 @@ export class PluginDataService {
 
   /**
    * 获取插件状态
+   * @param pluginName 插件名称
+   * @param marketplace 市场名称（可选，用于精确匹配同一插件在不同市场的情况）
    */
-  async getPluginStatus(pluginName: string): Promise<{
+  async getPluginStatus(pluginName: string, marketplace?: string): Promise<{
     installed: boolean;
     enabled?: boolean;
     scope?: PluginScope;
@@ -75,7 +77,10 @@ export class PluginDataService {
     updateAvailable?: boolean;
   }> {
     const installedPlugins = await this.getInstalledPlugins();
-    const installedPlugin = installedPlugins.find(p => p.name === pluginName);
+    // 同时匹配插件名和市场名（如果提供了 marketplace 参数）
+    const installedPlugin = installedPlugins.find(p =>
+      p.name === pluginName && (!marketplace || p.marketplace === marketplace)
+    );
 
     if (!installedPlugin) {
       return { installed: false };
@@ -328,7 +333,7 @@ export class PluginDataService {
       const allPlugins = await this.getAllAvailablePlugins();
       const plugin = allPlugins.find(p => p.name === pluginName);
 
-      if (!plugin) {
+      if (!plugin || !plugin.version) {
         return false;
       }
 

@@ -96,6 +96,7 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'sidebar.js')
     );
 
+    // 现在每个入口点都有独立的 CSS 文件
     const styleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'sidebar.css')
     );
@@ -110,6 +111,15 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline';">
   <link href="${styleUri}" rel="stylesheet">
   <title>Claude 插件市场</title>
+  <style>
+    /* 移除 VS Code WebviewView 的默认内边距 */
+    body {
+      padding: 0 !important;
+    }
+    html {
+      padding: 0 !important;
+    }
+  </style>
 </head>
 <body>
   <div id="root"></div>

@@ -3,7 +3,6 @@ import * as vscode from 'vscode';
 // 导入插件市场相关
 import { PluginManager } from './pluginMarketplace/pluginManager';
 import { PluginTreeItem, PluginScope } from './pluginMarketplace/types';
-import { PluginMarketplacePanel } from './pluginMarketplace/webview/PluginMarketplacePanel';
 import { PluginDetailsPanel } from './pluginMarketplace/webview/PluginDetailsPanel';
 import { SidebarWebviewViewProvider } from './pluginMarketplace/webview/SidebarWebviewView';
 import { PluginDataService } from './pluginMarketplace/webview/services/PluginDataService';
@@ -52,15 +51,6 @@ export function activate(context: vscode.ExtensionContext): void {
   // 注册侧边栏 WebviewViewProvider
   sidebarProvider = new SidebarWebviewViewProvider(context.extensionUri, dataService);
   vscode.window.registerWebviewViewProvider('claudePluginMarketplaceSidebar', sidebarProvider);
-
-  // 注册打开插件市场命令
-  const openMarketplaceCommand = vscode.commands.registerCommand(
-    'claudePluginMarketplace.open',
-    () => {
-      PluginMarketplacePanel.createOrShow(context.extensionUri, dataService!);
-    }
-  );
-  context.subscriptions.push(openMarketplaceCommand);
 
   // 注册命令
   registerPluginMarketplaceCommands(context, sidebarProvider, dataService);
@@ -303,22 +293,4 @@ function registerPluginMarketplaceCommands(
     })
   );
 
-  // 搜索插件命令 - 打开 Webview 并传递搜索关键词
-  context.subscriptions.push(
-    vscode.commands.registerCommand('claudePluginMarketplace.searchPlugins', async () => {
-      const searchTerm = await vscode.window.showInputBox({
-        prompt: '搜索插件',
-        placeHolder: '输入插件名称或关键词'
-      });
-
-      if (searchTerm) {
-        PluginMarketplacePanel.createOrShow(context.extensionUri, dataService);
-
-        // 延迟发送搜索消息，确保 Webview 已加载
-        setTimeout(() => {
-          PluginMarketplacePanel.currentPanel?.sendSearchTerm(searchTerm);
-        }, 500);
-      }
-    })
-  );
 }

@@ -41,11 +41,6 @@
     },
     "commands": [
       {
-        "command": "claudePluginMarketplace.open",
-        "title": "打开插件市场面板",
-        "icon": "$(extensions)"
-      },
-      {
         "command": "claudePluginMarketplace.refresh",
         "title": "刷新插件列表",
         "icon": "$(refresh)"
@@ -87,16 +82,11 @@
       {
         "command": "claudePluginMarketplace.disablePlugin",
         "title": "禁用插件"
-      },
-      {
-        "command": "claudePluginMarketplace.searchPlugins",
-        "title": "搜索插件",
-        "icon": "$(search)"
       }
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run compile && npm run build-webview",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
@@ -104,18 +94,29 @@
     "test:integration": "jest --testPathPattern=integration",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "build-webview": "cd ../webview-app && npm run build && rm -rf ../vscode-extension/webview/dist && mkdir -p ../vscode-extension/webview/dist && cp -r dist/* ../vscode-extension/webview/dist/"
+    "build-webview": "cd webview && npx tsc && npx vite build && shx rm -rf dist/src && shx mv dist/sidebar.* dist/ 2>/dev/null || true",
+    "dev-webview": "cd webview && npx vite"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.0",
+    "@types/jest": "^29.5.14",
     "@types/node": "^18.19.130",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.2.0",
     "@types/vscode": "^1.80.0",
-    "jest": "^29.5.0",
-    "ts-jest": "^29.1.0",
-    "typescript": "^5.0.0"
+    "@vitejs/plugin-react": "^4.2.0",
+    "jest": "^29.7.0",
+    "shx": "^0.3.4",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.1.0",
+    "@types/yaml": "^1.9.6",
+    "antd": "^6.3.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "yaml": "^2.8.2"
   }
 }
