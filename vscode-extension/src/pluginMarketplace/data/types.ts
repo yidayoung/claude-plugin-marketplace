@@ -1,6 +1,7 @@
 // vscode-extension/src/pluginMarketplace/data/types.ts
 
 import { PluginDetailData } from '../webview/messages/types';
+import { PluginScope } from '../types';
 
 // 市场信息
 export interface MarketplaceInfo {
@@ -24,7 +25,7 @@ export interface PluginInfo {
   marketplace: string;
   installed: boolean;
   enabled?: boolean;
-  scope?: 'user' | 'project';
+  scope?: PluginScope;
   stars?: number;
 }
 
@@ -32,7 +33,7 @@ export interface PluginInfo {
 export interface InstalledStatus {
   installed: boolean;
   enabled: boolean;
-  scope?: 'user' | 'project';
+  scope?: PluginScope;
 }
 
 // 插件详情缓存条目
