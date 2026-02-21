@@ -6,13 +6,18 @@ import * as fs from 'fs/promises';
 import { execClaudeCommand, InstalledPlugin } from '../types';
 import { MarketplaceInfo, PluginInfo } from './types';
 import { PluginDetailData } from '../webview/messages/types';
+import { PluginDetailsService } from '../webview/services/PluginDetailsService';
 
 /**
  * 数据加载器
  * 负责从文件系统和 CLI 加载数据
  */
 export class DataLoader {
-  constructor(private context: vscode.ExtensionContext) {}
+  private pluginDetailsService: PluginDetailsService;
+
+  constructor(private context: vscode.ExtensionContext) {
+    this.pluginDetailsService = new PluginDetailsService(context);
+  }
 
   /**
    * 加载已安装插件列表
@@ -81,17 +86,18 @@ export class DataLoader {
   }
 
   /**
-   * 获取插件详情（占位方法，将在 Task 9 中实现完整逻辑）
+   * 获取插件详情
+   * 委托给现有的 PluginDetailsService
+   * TODO: 未来可以将解析逻辑逐步迁移到 DataLoader
    */
   async getPluginDetail(
     pluginName: string,
     marketplace: string,
     isInstalled: boolean
   ): Promise<PluginDetailData> {
-    // TODO: 迁移自 PluginDetailsService 的逻辑
-    // 这里会调用 parseSkills, parseAgents 等方法
-    // 完整实现会在 Task 9 中从现有代码迁移
-    throw new Error('Plugin detail parsing not yet implemented - will be migrated in Task 9');
+    // 委托给现有的 PluginDetailsService
+    // 该服务已经实现了完整的解析逻辑（parseSkills, parseAgents 等）
+    return this.pluginDetailsService.getPluginDetail(pluginName, marketplace, isInstalled);
   }
 
   /**
