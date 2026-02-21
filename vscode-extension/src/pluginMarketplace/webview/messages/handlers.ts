@@ -2,6 +2,7 @@
 
 import * as vscode from 'vscode';
 import { PluginDataService } from '../services/PluginDataService';
+import { PluginDataStore } from '../../data/PluginDataStore';
 import {
   WebviewMessage,
   ExtensionMessage,
@@ -28,6 +29,7 @@ export class MessageHandler {
   constructor(
     private webview: vscode.Webview,
     private dataService: PluginDataService,
+    private dataStore: PluginDataStore,
     private extensionUri: vscode.Uri
   ) {}
 
@@ -189,23 +191,15 @@ export class MessageHandler {
       },
       async () => {
         try {
-          const result = await this.dataService.installPlugin(pluginName, marketplace, scope);
+          // 使用 PluginDataStore 安装插件（会自动发射事件）
+          await this.dataStore.installPlugin(pluginName, marketplace, scope as 'user' | 'project');
 
-          if (result.success) {
-            this.sendMessage({
-              type: 'installSuccess',
-              payload: { pluginName, scope }
-            });
+          this.sendMessage({
+            type: 'installSuccess',
+            payload: { pluginName, scope }
+          });
 
-            vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 安装成功`);
-          } else {
-            this.sendMessage({
-              type: 'installError',
-              payload: { pluginName, error: result.error || '安装失败' }
-            });
-
-            vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 安装失败: ${result.error}`);
-          }
+          vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 安装成功`);
         } catch (error: any) {
           const errorMessage = error.message || '未知错误';
           this.sendMessage({
@@ -247,23 +241,15 @@ export class MessageHandler {
       },
       async () => {
         try {
-          const result = await this.dataService.uninstallPlugin(pluginName);
+          // 使用 PluginDataStore 卸载插件（会自动发射事件）
+          await this.dataStore.uninstallPlugin(pluginName);
 
-          if (result.success) {
-            this.sendMessage({
-              type: 'uninstallSuccess',
-              payload: { pluginName }
-            });
+          this.sendMessage({
+            type: 'uninstallSuccess',
+            payload: { pluginName }
+          });
 
-            vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 卸载成功`);
-          } else {
-            this.sendMessage({
-              type: 'uninstallError',
-              payload: { pluginName, error: result.error || '卸载失败' }
-            });
-
-            vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 卸载失败: ${result.error}`);
-          }
+          vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 卸载成功`);
         } catch (error: any) {
           const errorMessage = error.message || '未知错误';
           this.sendMessage({
@@ -285,23 +271,15 @@ export class MessageHandler {
     const { pluginName, marketplace } = payload;
 
     try {
-      const result = await this.dataService.enablePlugin(pluginName, marketplace);
+      // 使用 PluginDataStore 启用插件（会自动发射事件）
+      await this.dataStore.enablePlugin(pluginName, marketplace);
 
-      if (result.success) {
-        this.sendMessage({
-          type: 'enableSuccess',
-          payload: { pluginName, marketplace }
-        });
+      this.sendMessage({
+        type: 'enableSuccess',
+        payload: { pluginName, marketplace }
+      });
 
-        vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已启用`);
-      } else {
-        this.sendMessage({
-          type: 'enableError',
-          payload: { pluginName, error: result.error || '启用失败' }
-        });
-
-        vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 启用失败: ${result.error}`);
-      }
+      vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已启用`);
     } catch (error: any) {
       const errorMessage = error.message || '未知错误';
       this.sendMessage({
@@ -320,23 +298,15 @@ export class MessageHandler {
     const { pluginName, marketplace } = payload;
 
     try {
-      const result = await this.dataService.disablePlugin(pluginName, marketplace);
+      // 使用 PluginDataStore 禁用插件（会自动发射事件）
+      await this.dataStore.disablePlugin(pluginName, marketplace);
 
-      if (result.success) {
-        this.sendMessage({
-          type: 'disableSuccess',
-          payload: { pluginName, marketplace }
-        });
+      this.sendMessage({
+        type: 'disableSuccess',
+        payload: { pluginName, marketplace }
+      });
 
-        vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已禁用`);
-      } else {
-        this.sendMessage({
-          type: 'disableError',
-          payload: { pluginName, error: result.error || '禁用失败' }
-        });
-
-        vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 禁用失败: ${result.error}`);
-      }
+      vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已禁用`);
     } catch (error: any) {
       const errorMessage = error.message || '未知错误';
       this.sendMessage({

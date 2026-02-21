@@ -61,7 +61,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
 
   // 注册侧边栏 WebviewViewProvider
-  sidebarProvider = new SidebarWebviewViewProvider(context.extensionUri, dataService);
+  sidebarProvider = new SidebarWebviewViewProvider(context.extensionUri, dataService, dataStore!);
   vscode.window.registerWebviewViewProvider('claudePluginMarketplaceSidebar', sidebarProvider);
 
   // 注册命令

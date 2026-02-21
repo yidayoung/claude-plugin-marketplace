@@ -2,6 +2,7 @@
 
 import * as vscode from 'vscode';
 import { PluginDataService } from './services/PluginDataService';
+import { PluginDataStore } from '../data/PluginDataStore';
 import { MessageHandler } from './messages/handlers';
 
 /**
@@ -13,13 +14,16 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
 
   private _view?: vscode.WebviewView;
   private _dataService: PluginDataService;
+  private _dataStore: PluginDataStore;
   private _messageHandler?: MessageHandler;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    dataService: PluginDataService
+    dataService: PluginDataService,
+    dataStore: PluginDataStore
   ) {
     this._dataService = dataService;
+    this._dataStore = dataStore;
   }
 
   /**
@@ -45,7 +49,7 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
     // 创建消息处理器
-    this._messageHandler = new MessageHandler(webviewView.webview, this._dataService, this._extensionUri);
+    this._messageHandler = new MessageHandler(webviewView.webview, this._dataService, this._dataStore, this._extensionUri);
 
     // 监听消息
     webviewView.webview.onDidReceiveMessage(
