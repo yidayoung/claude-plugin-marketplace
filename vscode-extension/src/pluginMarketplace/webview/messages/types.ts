@@ -39,7 +39,9 @@ export type ExtensionMessageType =
   | 'marketplaceSuccess'
   | 'marketplaceError'
   | 'error'
-  | 'pluginDetail';
+  | 'pluginDetail'
+  | 'detailUpdate'
+  | 'statusUpdate';
 
 /**
  * Webview 消息基础结构
@@ -310,3 +312,16 @@ export interface PluginDetailMessagePayload {
   plugin: PluginDetailData;
 }
 
+/**
+ * 插件详情更新消息负载（用于 Store 事件）
+ */
+export interface DetailUpdatePayload {
+  updates: Partial<PluginDetailData>;
+}
+
+/**
+ * 插件状态更新消息负载（用于 Store 事件）
+ */
+export interface StatusUpdatePayload {
+  change: 'installed' | 'uninstalled' | 'enabled' | 'disabled';
+}
