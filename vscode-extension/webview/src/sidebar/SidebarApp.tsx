@@ -256,6 +256,8 @@ const SidebarApp: React.FC = () => {
 
   // 渲染插件项
   const renderPluginItem = (plugin: PluginData) => {
+    const [isHovered, setIsHovered] = useState(false);
+
     const statusIcon = plugin.updateAvailable
       ? <SyncOutlined style={{ color: '#faad14' }} />
       : plugin.enabled === false
@@ -330,9 +332,11 @@ const SidebarApp: React.FC = () => {
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = 'var(--vscode-list-hoverBackground)';
+          setIsHovered(true);
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'transparent';
+          setIsHovered(false);
         }}
       >
         <Flex align="center" gap={8}>
@@ -352,14 +356,8 @@ const SidebarApp: React.FC = () => {
             style={{
               display: 'flex',
               gap: 2,
-              opacity: 0,
+              opacity: isHovered ? 1 : 0,
               transition: 'opacity 0.15s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '1';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '0';
             }}
           >
             {plugin.installed ? (
@@ -432,6 +430,7 @@ const SidebarApp: React.FC = () => {
     children: React.ReactNode,
     actions?: React.ReactNode
   ) => {
+    const [isHovered, setIsHovered] = useState(false);
     const isExpanded = expandedSections.has(sectionKey);
     return (
       <Space direction="vertical" size={4} style={{ width: '100%' }}>
@@ -452,9 +451,11 @@ const SidebarApp: React.FC = () => {
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--vscode-toolbar-hoverBackground)';
+            setIsHovered(true);
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent';
+            setIsHovered(false);
           }}
         >
           <span style={{ display: 'flex', alignItems: 'center', fontSize: 10 }}>
@@ -468,14 +469,8 @@ const SidebarApp: React.FC = () => {
                 marginLeft: 'auto',
                 display: 'flex',
                 gap: 2,
-                opacity: 0,
+                opacity: isHovered ? 1 : 0,
                 transition: 'opacity 0.15s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = '1';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = '0';
               }}
             >
               {actions}

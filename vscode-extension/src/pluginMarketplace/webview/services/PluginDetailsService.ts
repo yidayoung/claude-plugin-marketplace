@@ -34,6 +34,8 @@ export class PluginDetailsService {
   private cache = new Map<string, DetailCacheEntry>();
   // 缓存过期时间（5分钟）
   private readonly CACHE_TTL = 5 * 60 * 1000;
+  // 本地市场路径缓存，避免重复查找
+  private localPathCache = new Map<string, string>();
 
   constructor(private context: vscode.ExtensionContext) {}
 
@@ -75,13 +77,104 @@ export class PluginDetailsService {
   clearCache(pluginName: string, marketplace?: string): void {
     if (marketplace) {
       this.cache.delete(`${pluginName}@${marketplace}`);
+      this.localPathCache.delete(`${pluginName}@${marketplace}`);
     } else {
       // 清除所有匹配的缓存
       for (const key of this.cache.keys()) {
         if (key.startsWith(`${pluginName}@`)) {
           this.cache.delete(key);
+          this.localPathCache.delete(key);
         }
       }
+    }
+  }
+
+  /**
+   * 清除所有缓存
+   */
+  clearAllCache(): void {
+    this.cache.clear();
+    this.localPathCache.clear();
+    console.log('[PluginDetailsService] All caches cleared');
+  }
+
+  /**
+   * 获取插件的本地市场源路径
+   * 通过读取 marketplace.json 获取插件的 source 配置
+   * - 相对路径：直接从市场目录读取
+   * - 远程 Git：未安装时无法读取，返回 null
+   */
+  private async getLocalMarketPath(
+    pluginName: string,
+    marketplace: string
+  ): Promise<string | null> {
+    const cacheKey = `${pluginName}@${marketplace}`;
+
+    // 检查缓存
+    const cachedPath = this.localPathCache.get(cacheKey);
+    if (cachedPath) {
+      try {
+        await fs.access(cachedPath);
+        return cachedPath;
+      } catch {
+        // 缓存的路径不存在，清除缓存
+        this.localPathCache.delete(cacheKey);
+      }
+    }
+
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    if (!homeDir) {
+      console.error('[PluginDetailsService] Cannot determine HOME directory');
+      return null;
+    }
+
+    const marketplacePath = path.join(homeDir, '.claude', 'plugins', 'marketplaces', marketplace);
+    const marketplaceJsonPath = path.join(marketplacePath, '.claude-plugin', 'marketplace.json');
+
+    console.log(`[PluginDetailsService] Looking for marketplace.json at: ${marketplaceJsonPath}`);
+
+    try {
+      // 读取 marketplace.json
+      const marketplaceContent = await fs.readFile(marketplaceJsonPath, 'utf-8');
+      const marketplaceConfig = JSON.parse(marketplaceContent);
+
+      // 查找目标插件
+      const pluginConfig = marketplaceConfig.plugins?.find((p: any) => p.name === pluginName);
+      if (!pluginConfig) {
+        console.log(`[PluginDetailsService] Plugin ${pluginName} not found in marketplace.json`);
+        return null;
+      }
+
+      const source = pluginConfig.source;
+      console.log(`[PluginDetailsService] Plugin ${pluginName} source:`, source);
+
+      // 处理相对路径 source
+      if (typeof source === 'string' && source.startsWith('./')) {
+        const relativePath = source.slice(2); // 去掉 ./
+        const fullPath = path.join(marketplacePath, relativePath);
+
+        try {
+          await fs.access(fullPath);
+          console.log(`[PluginDetailsService] Found local path: ${fullPath}`);
+          this.localPathCache.set(cacheKey, fullPath);
+          return fullPath;
+        } catch {
+          console.log(`[PluginDetailsService] Local path not accessible: ${fullPath}`);
+          return null;
+        }
+      }
+
+      // 远程 Git 仓库
+      if (typeof source === 'object') {
+        console.log(`[PluginDetailsService] Plugin ${pluginName} has remote source, skipping local read`);
+        return null;
+      }
+
+      console.log(`[PluginDetailsService] Unknown source type for ${pluginName}:`, source);
+      return null;
+    } catch (error) {
+      console.error(`[PluginDetailsService] Error reading marketplace.json:`, error);
+      return null;
     }
   }
 
@@ -139,6 +232,9 @@ export class PluginDetailsService {
     const key = `${pluginName}@${marketplace}`;
     const isEnabled = enabledMap.get(key);
 
+    // 使用安装信息中的实际市场名称，而不是 'installed'
+    const actualMarketplace = installedInfo?.marketplace || marketplace;
+
     return {
       name: configJson?.name || pluginName,
       description: configJson?.description || '',
@@ -146,7 +242,7 @@ export class PluginDetailsService {
       author: configJson?.author?.name || configJson?.author,
       homepage: configJson?.homepage,
       category: configJson?.keywords?.[0],
-      marketplace: 'installed',
+      marketplace: actualMarketplace, // 使用实际的市场名称
       installed: true,
       enabled: isEnabled ?? true, // 默认启用
       scope: installedInfo?.scope,
@@ -160,7 +256,8 @@ export class PluginDetailsService {
       outputStyles,
       repository,
       dependencies,
-      license: configJson?.license
+      license: configJson?.license,
+      localPath: pluginPath
     };
   }
 
@@ -196,6 +293,9 @@ export class PluginDetailsService {
     pluginName: string,
     marketplace: string
   ): Promise<PluginDetailData> {
+    const startTime = Date.now();
+    console.log(`[PluginDetailsService] Loading remote plugin: ${pluginName}@${marketplace}`);
+
     // 从缓存管理器获取市场信息
     const { CacheManager } = await import('./CacheManager');
     const cache = new CacheManager(this.context);
@@ -214,16 +314,21 @@ export class PluginDetailsService {
       throw new Error(`找不到插件 ${pluginName}@${marketplace}`);
     }
 
-    // 尝试多个可能的本地市场目录路径
-    const homeDir = process.env.HOME || '';
-    const possiblePaths = [
-      // 标准路径: ~/.claude/plugins/marketplaces/{marketplace}/plugins/{pluginName}/
-      path.join(homeDir, '.claude', 'plugins', 'marketplaces', marketplace, 'plugins', pluginName),
-      // external_plugins 路径: ~/.claude/plugins/marketplaces/{marketplace}/external_plugins/{pluginName}/
-      path.join(homeDir, '.claude', 'plugins', 'marketplaces', marketplace, 'external_plugins', pluginName),
-      // 源码路径（对于 git submodule 等）: ~/.claude/plugins/marketplaces/{marketplace}/src/{pluginName}/
-      path.join(homeDir, '.claude', 'plugins', 'marketplaces', marketplace, 'src', pluginName),
-    ];
+    // 读取 marketplace.json 获取插件的 source 配置
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    let marketplaceConfig: any = null;
+    if (homeDir) {
+      const marketplaceJsonPath = path.join(homeDir, '.claude', 'plugins', 'marketplaces', marketplace, '.claude-plugin', 'marketplace.json');
+      try {
+        const content = await fs.readFile(marketplaceJsonPath, 'utf-8');
+        marketplaceConfig = JSON.parse(content);
+      } catch {
+        // 忽略错误
+      }
+    }
+
+    const t1 = Date.now();
+    console.log(`[PluginDetailsService] Cache lookup took ${t1 - startTime}ms`);
 
     let readme = '';
     let skills: SkillInfo[] = [];
@@ -237,21 +342,16 @@ export class PluginDetailsService {
     let license: string | undefined;
 
     let configJson: any = undefined;
-    let localMarketPath: string | null = null;
 
-    // 尝试找到可用的本地路径
-    for (const possiblePath of possiblePaths) {
-      try {
-        await fs.access(possiblePath);
-        localMarketPath = possiblePath;
-        break;
-      } catch {
-        continue;
-      }
-    }
+    // 使用缓存优化的路径查找方法
+    const t2 = Date.now();
+    const localMarketPath = await this.getLocalMarketPath(pluginName, marketplace);
+    console.log(`[PluginDetailsService] Path lookup took ${Date.now() - t2}ms, found: ${localMarketPath ? 'YES' : 'NO'}`);
 
     if (localMarketPath) {
       try {
+        const t3 = Date.now();
+
         // 首先读取配置文件（用于获取自定义路径）
         try {
           const configPath = path.join(localMarketPath, '.claude-plugin', 'plugin.json');
@@ -265,8 +365,14 @@ export class PluginDetailsService {
           // 配置文件不存在，继续
         }
 
+        const t4 = Date.now();
+        console.log(`[PluginDetailsService] Config read took ${t4 - t3}ms`);
+
         // 读取 README
         readme = await this.readReadme(localMarketPath);
+
+        const t5 = Date.now();
+        console.log(`[PluginDetailsService] README read took ${t5 - t4}ms`);
 
         // 解析插件内容（传入 configJson 以支持自定义路径）
         [skills, agents, commands, hooks, mcps, lsps, outputStyles] = await Promise.all([
@@ -278,23 +384,56 @@ export class PluginDetailsService {
           this.parseLsps(localMarketPath, configJson),
           this.parseOutputStyles(localMarketPath, configJson),
         ]);
-      } catch {
+
+        const t6 = Date.now();
+        console.log(`[PluginDetailsService] Content parsing took ${t6 - t5}ms (skills:${skills.length}, agents:${agents.length}, commands:${commands.length}, hooks:${hooks.length}, mcps:${mcps.length}, lsps:${lsps.length}, outputStyles:${outputStyles.length})`);
+      } catch (error) {
+        console.error(`[PluginDetailsService] Local read failed:`, error);
         // 本地读取失败，继续使用 GitHub 获取
       }
     }
 
-    // 如果本地没有找到，尝试从 GitHub 获取 README
-    if (!readme && market.source.source === 'github' && market.source.repo) {
-      const repoInfo = this.parseGitHubRepo(market.source.repo);
-      readme = await this.fetchGitHubReadme(repoInfo.owner, repoInfo.repo, pluginName);
-      if (!repository) {
+    // 注意：不再从 GitHub 获取 README 和 stars
+    // - README: 本地有就用，没有就留空
+    // - stars: 通过延迟加载异步获取
+    // 这样可以大幅提升未安装插件的加载速度
+
+    // 确保 repository 对象存在（用于显示 GitHub 链接）
+    // 对于远程插件，从插件的 source 配置中获取仓库地址
+    if (!repository && !localMarketPath) {
+      const pluginConfig = marketplaceConfig.plugins?.find((p: any) => p.name === pluginName);
+      if (pluginConfig?.source) {
+        const source = pluginConfig.source;
+        if (typeof source === 'object') {
+          if (source.source === 'github' && source.repo) {
+            // GitHub 类型：owner/repo
+            repository = {
+              type: 'github',
+              url: `https://github.com/${source.repo}`
+            };
+          } else if (source.source === 'url' && source.url) {
+            // URL 类型：完整的 Git 仓库 URL
+            repository = {
+              type: 'other',
+              url: source.url
+            };
+          }
+        }
+      }
+      // 如果还是没有，且 plugin.homepage 存在，使用它作为回退
+      if (!repository && plugin.homepage) {
         repository = {
-          type: 'github',
-          url: `https://github.com/${repoInfo.owner}/${repoInfo.repo}`,
-          stars: await this.fetchGitHubStars(repoInfo.owner, repoInfo.repo)
+          type: 'other',
+          url: plugin.homepage
         };
       }
     }
+
+    const totalTime = Date.now() - startTime;
+    console.log(`[PluginDetailsService] Total loading time for ${pluginName}@${marketplace}: ${totalTime}ms`);
+
+    // 判断是否为远程源（本地没有完整解析的数据）
+    const isRemoteSource = !localMarketPath || (skills.length === 0 && agents.length === 0 && commands.length === 0 && hooks.length === 0 && mcps.length === 0 && lsps.length === 0 && !readme);
 
     return {
       name: plugin.name,
@@ -315,7 +454,9 @@ export class PluginDetailsService {
       outputStyles,
       repository,
       dependencies: [],
-      license
+      license,
+      isRemoteSource,
+      localPath: localMarketPath || undefined
     };
   }
 
@@ -513,6 +654,31 @@ export class PluginDetailsService {
   }
 
   /**
+   * 异步获取插件的 GitHub stars（不阻塞主流程）
+   * 返回 Promise，调用者可以选择 await 或在后台执行
+   */
+  async fetchPluginStarsAsync(pluginName: string, marketplace: string): Promise<number | null> {
+    try {
+      const { CacheManager } = await import('./CacheManager');
+      const cache = new CacheManager(this.context);
+      const marketplaces = await cache.getMarketplaces();
+      const market = marketplaces.find(m => m.name === marketplace);
+
+      if (!market || market.source.source !== 'github' || !market.source.repo) {
+        return null;
+      }
+
+      const repoInfo = this.parseGitHubRepo(market.source.repo);
+      const stars = await this.fetchGitHubStars(repoInfo.owner, repoInfo.repo);
+      console.log(`[PluginDetailsService] Fetched stars for ${pluginName}: ${stars}`);
+      return stars;
+    } catch (error) {
+      console.error(`[PluginDetailsService] Failed to fetch stars for ${pluginName}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * 解析 GitHub 仓库信息
    * 支持两种格式:
    * - "owner/repo" (简写格式，来自 known_marketplaces.json)
@@ -682,10 +848,14 @@ export class PluginDetailsService {
     // 收集所有要搜索的 agents 目录
     const searchDirs: string[] = [...customPaths, path.join(pluginPath, 'agents')];
 
+    console.log(`[PluginDetailsService] parseAgents: searching in dirs:`, searchDirs);
+
     for (const agentsDir of searchDirs) {
       try {
         await fs.access(agentsDir);
         const entries = await fs.readdir(agentsDir);
+
+        console.log(`[PluginDetailsService] parseAgents: found dir ${agentsDir} with ${entries.length} entries`);
 
         for (const entry of entries) {
           if (!entry.endsWith('.md') || entry.startsWith('.')) continue;
@@ -695,19 +865,23 @@ export class PluginDetailsService {
             const content = await fs.readFile(agentPath, 'utf-8');
             const agentName = entry.replace(/\.md$/, '');
             const agent = this.parseAgentMarkdown(agentName, content);
+            console.log(`[PluginDetailsService] parseAgents: parsed agent ${agentName}, result:`, agent ? 'SUCCESS' : 'FAILED');
             if (agent && !agents.find(a => a.name === agent.name)) {
               agent.filePath = agentPath;
               agents.push(agent);
             }
-          } catch {
+          } catch (error) {
+            console.log(`[PluginDetailsService] parseAgents: failed to read ${agentPath}:`, error);
             continue;
           }
         }
-      } catch {
+      } catch (error) {
+        console.log(`[PluginDetailsService] parseAgents: dir ${agentsDir} not accessible:`, error);
         // 目录不存在，继续下一个
       }
     }
 
+    console.log(`[PluginDetailsService] parseAgents: returning ${agents.length} agents`);
     return agents;
   }
 
@@ -1056,7 +1230,8 @@ export class PluginDetailsService {
    * 提取 --- 包裹的 YAML frontmatter 并使用标准 YAML 解析器
    */
   private parseFrontmatter(markdown: string): Record<string, any> | null {
-    const frontmatterMatch = markdown.match(/^---\n([\s\S]*?)\n---/);
+    // 支持 LF (\n) 和 CRLF (\r\n) 行尾符
+    const frontmatterMatch = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/);
     if (!frontmatterMatch) return null;
 
     try {

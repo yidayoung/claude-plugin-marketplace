@@ -2,6 +2,7 @@
 
 import * as vscode from 'vscode';
 import { PluginDetailsService } from './services/PluginDetailsService';
+import { PluginDataService } from './services/PluginDataService';
 import { OpenFilePayload } from './messages/types';
 
 /**
@@ -15,6 +16,7 @@ export class PluginDetailsPanel {
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private readonly _detailService: PluginDetailsService;
+  private readonly _dataService: PluginDataService;
   private _disposables: vscode.Disposable[] = [];
   private _webviewReady = false; // 跟踪 webview 是否已准备好
 
@@ -76,6 +78,7 @@ export class PluginDetailsPanel {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._detailService = new PluginDetailsService(context);
+    this._dataService = new PluginDataService(context);
 
     // 设置 HTML
     this._panel.webview.html = this._getHtmlForWebview();
@@ -114,6 +117,10 @@ export class PluginDetailsPanel {
 
     console.log(`[PluginDetailsPanel] Loading details: ${pluginName} from ${marketplace}, installed: ${isInstalled}`);
 
+    // 清除缓存以确保获取最新数据
+    this._detailService.clearCache(pluginName, marketplace);
+    console.log(`[PluginDetailsPanel] Cleared cache for ${pluginName}@${marketplace}`);
+
     try {
       const detail = await this._detailService.getPluginDetail(pluginName, marketplace, isInstalled);
       console.log(`[PluginDetailsPanel] Got detail:`, detail);
@@ -123,12 +130,32 @@ export class PluginDetailsPanel {
         payload: { plugin: detail }
       });
       console.log(`[PluginDetailsPanel] Sent pluginDetail message`);
+
+      // 延迟加载 stars：在后台异步获取，不阻塞主流程
+      if (detail.repository?.url && !detail.repository.stars) {
+        this.fetchStarsInBackground(pluginName, marketplace);
+      }
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error(`[PluginDetailsPanel] Error loading details:`, errorMsg);
       this.sendMessage({
         type: 'error',
         payload: { message: `加载插件详情失败: ${errorMsg}` }
+      });
+    }
+  }
+
+  /**
+   * 在后台异步获取 stars 并更新到前端
+   */
+  private async fetchStarsInBackground(pluginName: string, marketplace: string): Promise<void> {
+    console.log(`[PluginDetailsPanel] Fetching stars in background for ${pluginName}@${marketplace}`);
+    const stars = await this._detailService.fetchPluginStarsAsync(pluginName, marketplace);
+    if (stars !== null) {
+      console.log(`[PluginDetailsPanel] Got stars: ${stars}, sending update`);
+      this.sendMessage({
+        type: 'starsUpdate',
+        payload: { pluginName, marketplace, stars }
       });
     }
   }
@@ -146,17 +173,68 @@ export class PluginDetailsPanel {
           await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled);
           break;
         case 'installPlugin':
-          // 转发到主市场面板处理
-          await vscode.commands.executeCommand('claudePluginMarketplace.install', message.payload);
+          // 直接调用 dataService
+          try {
+            const { pluginName, marketplace, scope } = message.payload;
+            const result = await this._dataService.installPlugin(pluginName, marketplace, scope);
+            if (result.success) {
+              vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 安装成功`);
+              // 刷新详情面板
+              await this.loadPluginDetail(this._pluginName, this._marketplace, true);
+            } else {
+              vscode.window.showErrorMessage(`❌ 安装失败: ${result.error || '未知错误'}`);
+            }
+          } catch (error: any) {
+            vscode.window.showErrorMessage(`❌ 安装失败: ${error.message || '未知错误'}`);
+          }
           break;
         case 'uninstallPlugin':
-          await vscode.commands.executeCommand('claudePluginMarketplace.uninstall', message.payload);
+          // 直接调用 dataService
+          try {
+            const { pluginName } = message.payload;
+            const result = await this._dataService.uninstallPlugin(pluginName);
+            if (result.success) {
+              vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已卸载`);
+              // 刷新详情面板
+              await this.loadPluginDetail(this._pluginName, this._marketplace, false);
+            } else {
+              vscode.window.showErrorMessage(`❌ 卸载失败: ${result.error || '未知错误'}`);
+            }
+          } catch (error: any) {
+            vscode.window.showErrorMessage(`❌ 卸载失败: ${error.message || '未知错误'}`);
+          }
           break;
         case 'enablePlugin':
-          await vscode.commands.executeCommand('claudePluginMarketplace.enable', message.payload);
+          // 直接调用 dataService
+          try {
+            const { pluginName, marketplace } = message.payload;
+            const result = await this._dataService.enablePlugin(pluginName, marketplace);
+            if (result.success) {
+              vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已启用`);
+              // 刷新详情面板
+              await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled);
+            } else {
+              vscode.window.showErrorMessage(`❌ 启用失败: ${result.error || '未知错误'}`);
+            }
+          } catch (error: any) {
+            vscode.window.showErrorMessage(`❌ 启用失败: ${error.message || '未知错误'}`);
+          }
           break;
         case 'disablePlugin':
-          await vscode.commands.executeCommand('claudePluginMarketplace.disable', message.payload);
+          // 直接调用 dataService
+          try {
+            const { pluginName, marketplace } = message.payload;
+            const result = await this._dataService.disablePlugin(pluginName, marketplace);
+            if (result.success) {
+              vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已禁用`);
+              // 刷新详情面板
+              await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled);
+            } else {
+              vscode.window.showErrorMessage(`❌ 禁用失败: ${result.error || '未知错误'}`);
+            }
+          } catch (error: any) {
+            vscode.window.showErrorMessage(`❌ 禁用失败: ${error.message || '未知错误'}`);
+          }
           break;
         case 'openExternal':
           vscode.env.openExternal(vscode.Uri.parse(message.payload.url));
@@ -167,6 +245,28 @@ export class PluginDetailsPanel {
           const fileUri = vscode.Uri.file(filePath);
           const doc = await vscode.workspace.openTextDocument(fileUri);
           await vscode.window.showTextDocument(doc);
+          break;
+        case 'openDirectory':
+          // 打开目录在系统文件管理器中
+          const directoryPath = message.payload.directoryPath;
+          const directoryUri = vscode.Uri.file(directoryPath);
+          // 根据操作系统使用不同的命令
+          switch (process.platform) {
+            case 'win32':
+              // Windows: 使用 explorer
+              await vscode.env.openExternal(directoryUri);
+              break;
+            case 'darwin':
+              // macOS: 使用 open
+              await vscode.env.openExternal(directoryUri);
+              break;
+            case 'linux':
+              // Linux: 使用 xdg-open
+              await vscode.env.openExternal(directoryUri);
+              break;
+            default:
+              vscode.window.showWarningMessage('不支持的操作系统');
+          }
           break;
         case 'copyToClipboard':
           await vscode.env.clipboard.writeText(message.payload.text);

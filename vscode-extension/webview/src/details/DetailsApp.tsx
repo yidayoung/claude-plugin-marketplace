@@ -1,6 +1,6 @@
 // vscode-extension/webview/src/details/DetailsApp.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Spin, Alert, Button } from 'antd';
 import { ReloadOutlined, LoadingOutlined } from '@ant-design/icons';
 import DetailHeader from './DetailHeader';
@@ -35,6 +35,8 @@ export interface PluginDetailData {
   repository?: RepositoryInfo;
   dependencies?: string[];
   license?: string;
+  isRemoteSource?: boolean;
+  localPath?: string;
 }
 
 export interface SkillInfo {
@@ -93,8 +95,8 @@ const DetailsApp: React.FC = () => {
   const [plugin, setPlugin] = useState<PluginDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [messageReceived, setMessageReceived] = useState(false);
   const [readyNotified, setReadyNotified] = useState(false);
+  const messageReceivedRef = useRef(false); // 使用 ref 避免闭包问题
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -106,12 +108,28 @@ const DetailsApp: React.FC = () => {
           setPlugin(message.payload.plugin);
           setLoading(false);
           setError(null);
-          setMessageReceived(true);
+          messageReceivedRef.current = true; // 标记已收到消息
+          break;
+        case 'starsUpdate':
+          console.log('[DetailsApp] Stars update received:', message.payload);
+          // 更新现有插件的 stars（使用函数式更新避免依赖 plugin）
+          setPlugin(prev => {
+            if (prev && prev.name === message.payload.pluginName) {
+              return {
+                ...prev,
+                repository: prev.repository ? {
+                  ...prev.repository,
+                  stars: message.payload.stars
+                } : undefined
+              };
+            }
+            return prev;
+          });
           break;
         case 'error':
           setError(message.payload.message);
           setLoading(false);
-          setMessageReceived(true);
+          messageReceivedRef.current = true;
           break;
       }
     };
@@ -125,12 +143,13 @@ const DetailsApp: React.FC = () => {
       setReadyNotified(true);
     }
 
-    // 添加超时处理：如果 30 秒后还没收到消息，显示错误
+    // 添加超时处理：如果 30 秒后还没收到消息，只停止加载状态
+    // 不会覆盖已加载的插件内容
     const timeoutId = setTimeout(() => {
-      if (!messageReceived) {
+      if (!messageReceivedRef.current) { // 使用 ref 检查最新的状态
         console.error('[DetailsApp] Timeout waiting for plugin data');
-        setError('加载插件详情超时，请重试');
-        setLoading(false);
+        setLoading(false); // 停止加载状态，但不设置 error
+        // 不设置 setError，避免覆盖已显示的插件内容
       }
     }, 30000);
 
@@ -138,7 +157,7 @@ const DetailsApp: React.FC = () => {
       window.removeEventListener('message', handleMessage);
       clearTimeout(timeoutId);
     };
-  }, [readyNotified]);
+  }, [readyNotified]); // 只依赖 readyNotified，确保 effect 只执行一次
 
   const handleInstall = (scope: 'user' | 'project') => {
     if (!plugin) return;
@@ -197,6 +216,13 @@ const DetailsApp: React.FC = () => {
     });
   };
 
+  const handleOpenDirectory = (directoryPath: string) => {
+    vscode.postMessage({
+      type: 'openDirectory',
+      payload: { directoryPath }
+    });
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -205,12 +231,13 @@ const DetailsApp: React.FC = () => {
     );
   }
 
-  if (error) {
+  // 只有在没有任何插件数据时才显示错误页面
+  if (!plugin && error) {
     return (
       <div style={{ padding: 24 }}>
         <Alert
           type="error"
-          message={error}
+          description={error}
           action={
             <Button size="small" danger onClick={() => window.location.reload()}>
               <ReloadOutlined /> 重试
@@ -222,16 +249,27 @@ const DetailsApp: React.FC = () => {
     );
   }
 
+  // 没有插件数据且没有错误
   if (!plugin) {
     return (
       <div style={{ padding: 24 }}>
-        <Alert message="未找到插件信息" type="warning" showIcon />
+        <Alert description="未找到插件信息" type="warning" showIcon />
       </div>
     );
   }
 
   return (
     <div style={{ padding: 20, maxWidth: 1200, margin: '0 auto' }}>
+      {/* 如果有插件数据但有错误，在顶部显示警告（不覆盖内容） */}
+      {error && (
+        <Alert
+          type="warning"
+          description={error}
+          closable
+          style={{ marginBottom: 16 }}
+          showIcon
+        />
+      )}
       <DetailHeader
         plugin={plugin}
         onInstall={handleInstall}
@@ -240,6 +278,7 @@ const DetailsApp: React.FC = () => {
         onDisable={handleDisable}
         onOpenExternal={handleOpenExternal}
         onCopy={handleCopy}
+        onOpenDirectory={handleOpenDirectory}
       />
       <DetailContent plugin={plugin} onOpenFile={handleOpenFile} />
     </div>

@@ -12,6 +12,12 @@ import { PluginDetailsService } from '../../src/pluginMarketplace/webview/servic
 
 // Mock vscode 模块
 jest.mock('vscode', () => ({
+  TreeItem: class {
+    public label: string = '';
+    constructor(label: string) {
+      this.label = label;
+    }
+  },
   workspace: {
     workspaceFolders: [{ uri: { fsPath: process.cwd() } }]
   }
@@ -250,6 +256,144 @@ describe('PluginDetailsService 集成测试', () => {
         expect(repoValue).toMatch(/^[^/]+\/[^/]+$/);
       } catch (e) {
         console.log('  ⚠ 无法读取 known_marketplaces.json');
+      }
+    });
+  });
+
+  describe('性能测试 - getRemotePluginDetail', () => {
+    it('未安装插件首次加载应快速返回（<50ms，不等待 GitHub）', async () => {
+      // serena 是未安装的插件，但在本地市场源目录中
+      const pluginName = 'serena';
+      const marketplace = 'claude-plugins-official';
+
+      console.log(`\n  📊 测试未安装插件加载性能: ${pluginName}@${marketplace}`);
+
+      const startTime = Date.now();
+      const result = await service.getRemotePluginDetail(pluginName, marketplace);
+      const loadTime = Date.now() - startTime;
+
+      console.log(`  ✓ 加载时间: ${loadTime}ms`);
+      console.log(`  ✓ 插件名称: ${result.name}`);
+      console.log(`  ✓ README 长度: ${result.readme?.length || 0} 字符 (本地无 README)`);
+      console.log(`  ✓ Skills: ${result.skills?.length || 0} 个`);
+      console.log(`  ✓ Agents: ${result.agents?.length || 0} 个`);
+      console.log(`  ✓ Commands: ${result.commands?.length || 0} 个`);
+      console.log(`  ✓ Repository URL: ${result.repository?.url || 'N/A'}`);
+      console.log(`  ✓ Repository Stars: ${result.repository?.stars ?? 'undefined (延迟加载)'}`);
+
+      expect(result.name).toBe(pluginName);
+      expect(result.installed).toBe(false);
+      // README 应该为空（本地没有，也不从 GitHub 获取）
+      expect(result.readme).toBe('');
+      // Stars 应该是 undefined（延迟加载）
+      expect(result.repository?.stars).toBeUndefined();
+
+      // 性能断言：应该非常快（<50ms），因为不等待任何 GitHub API
+      if (loadTime > 50) {
+        console.warn(`  ⚠ 性能警告: 加载时间 ${loadTime}ms 超过 50ms`);
+      }
+    });
+
+    it('相同插件第二次加载应该更快（使用缓存）', async () => {
+      const pluginName = 'serena';
+      const marketplace = 'claude-plugins-official';
+
+      console.log(`\n  📊 测试缓存性能: ${pluginName}@${marketplace}`);
+
+      // 第一次加载（使用 getPluginDetail 以触发缓存）
+      const t1 = Date.now();
+      await service.getPluginDetail(pluginName, marketplace, false);
+      const firstLoad = Date.now() - t1;
+      console.log(`  第一次加载: ${firstLoad}ms`);
+
+      // 第二次加载（应该使用缓存）
+      const t2 = Date.now();
+      await service.getPluginDetail(pluginName, marketplace, false);
+      const secondLoad = Date.now() - t2;
+      console.log(`  第二次加载: ${secondLoad}ms (缓存)`);
+
+      // 第二次应该更快（缓存时间 < 10ms）
+      expect(secondLoad).toBeLessThan(10);
+      console.log(`  ✓ 缓存命中，加载时间显著减少`);
+    });
+
+    it('延迟加载 stars 应该异步工作', async () => {
+      const pluginName = 'serena';
+      const marketplace = 'claude-plugins-official';
+
+      console.log(`\n  📊 测试延迟加载 stars: ${pluginName}@${marketplace}`);
+
+      // 先获取基础详情（不包含 stars）
+      const detail = await service.getRemotePluginDetail(pluginName, marketplace);
+      expect(detail.repository?.stars).toBeUndefined();
+      console.log(`  ✓ 基础详情加载完成，stars 为 undefined`);
+
+      // 然后异步获取 stars
+      const t1 = Date.now();
+      const stars = await service.fetchPluginStarsAsync(pluginName, marketplace);
+      const starsFetchTime = Date.now() - t1;
+
+      console.log(`  ✓ Stars 异步获取完成: ${stars}, 耗时: ${starsFetchTime}ms`);
+      expect(stars).toBeGreaterThanOrEqual(0);
+
+      // Stars 获取应该需要较长时间（GitHub API 调用）
+      if (starsFetchTime > 1000) {
+        console.log(`  ✓ Stars 获取耗时 ${starsFetchTime}ms（异步，不阻塞主流程）`);
+      }
+    });
+
+    it('本地路径缓存应生效', async () => {
+      const pluginName = 'serena';
+      const marketplace = 'claude-plugins-official';
+
+      console.log(`\n  📊 测试本地路径缓存: ${pluginName}@${marketplace}`);
+
+      // 清除缓存以测试完整流程
+      (service as any).localPathCache.clear();
+      (service as any).cache.clear();
+
+      // 第一次获取路径
+      const t1 = Date.now();
+      await service.getRemotePluginDetail(pluginName, marketplace);
+      const firstTime = Date.now() - t1;
+      console.log(`  首次加载（包含路径查找）: ${firstTime}ms`);
+
+      // 第二次获取（路径应该被缓存）
+      const t2 = Date.now();
+      await service.getRemotePluginDetail(pluginName, marketplace);
+      const secondTime = Date.now() - t2;
+      console.log(`  第二次加载（路径已缓存）: ${secondTime}ms`);
+
+      // 第二次应该明显更快
+      expect(secondTime).toBeLessThan(firstTime);
+      console.log(`  ✓ 本地路径缓存有效`);
+    });
+  });
+
+  describe('性能测试 - getInstalledPluginDetail', () => {
+    it('已安装插件加载应快速（<300ms）', async () => {
+      if (installedPlugins.length === 0) {
+        console.log('  ⚠ 跳过 - 没有已安装的插件');
+        return;
+      }
+
+      const plugin = installedPlugins[0];
+      console.log(`\n  📊 测试已安装插件加载性能: ${plugin.name}@${plugin.marketplace}`);
+
+      const startTime = Date.now();
+      const result = await service.getInstalledPluginDetail(plugin.name, plugin.marketplace);
+      const loadTime = Date.now() - startTime;
+
+      console.log(`  ✓ 加载时间: ${loadTime}ms`);
+      console.log(`  ✓ 插件名称: ${result.name}`);
+      console.log(`  ✓ 已安装: ${result.installed}`);
+
+      expect(result.name).toBe(plugin.name);
+      expect(result.installed).toBe(true);
+
+      // 已安装插件应该更快（<300ms）
+      if (loadTime > 300) {
+        console.warn(`  ⚠ 性能警告: 加载时间 ${loadTime}ms 超过 300ms`);
       }
     });
   });

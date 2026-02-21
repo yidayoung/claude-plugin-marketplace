@@ -7,6 +7,7 @@ import {
   DownloadOutlined,
   UserOutlined,
   FolderOutlined,
+  FolderOpenOutlined,
   GithubOutlined,
   LinkOutlined,
   CopyOutlined,
@@ -27,6 +28,7 @@ interface DetailHeaderProps {
   onDisable: () => void;
   onOpenExternal: (url: string) => void;
   onCopy: (text: string) => void;
+  onOpenDirectory?: (directoryPath: string) => void;
 }
 
 const scopeConfig = {
@@ -42,7 +44,8 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
   onEnable,
   onDisable,
   onOpenExternal,
-  onCopy
+  onCopy,
+  onOpenDirectory
 }) => {
   const isDisabled = plugin.installed && plugin.enabled === false;
   const scopeInfo = plugin.scope ? scopeConfig[plugin.scope] : null;
@@ -71,9 +74,31 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
       <Flex justify="space-between" align="flex-start" gap={16} style={{ marginBottom: 12 }}>
         <Space direction="vertical" size={4} style={{ flex: 1 }}>
           <Space size="middle">
-            <Title level={3} style={{ margin: 0 }}>
+            <Title
+              level={3}
+              style={{
+                margin: 0,
+                cursor: plugin.localPath ? 'pointer' : 'default'
+              }}
+              onClick={() => {
+                if (plugin.localPath && onOpenDirectory) {
+                  onOpenDirectory(plugin.localPath);
+                }
+              }}
+            >
               {plugin.name}
             </Title>
+            {plugin.localPath && onOpenDirectory && (
+              <Tooltip title="打开插件目录">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<FolderOpenOutlined />}
+                  onClick={() => onOpenDirectory(plugin.localPath!)}
+                  style={{ fontSize: 16, padding: '0 4px' }}
+                />
+              </Tooltip>
+            )}
             <Tag color="blue">v{plugin.version}</Tag>
             {plugin.installed && !isDisabled && (
               <Tooltip title="已启用">

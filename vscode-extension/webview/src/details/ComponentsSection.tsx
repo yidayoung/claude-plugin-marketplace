@@ -1,7 +1,7 @@
 // vscode-extension/webview/src/details/ComponentsSection.tsx
 
 import React from 'react';
-import { Typography, Collapse, Tag, Space } from 'antd';
+import { Typography, Collapse, Tag, Space, Alert } from 'antd';
 import {
   ThunderboltOutlined,
   RobotOutlined,
@@ -9,7 +9,8 @@ import {
   CodeOutlined,
   ControlOutlined,
   BulbOutlined,
-  FileOutlined
+  FileOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons';
 import type { PluginDetailData } from './DetailsApp';
 
@@ -60,7 +61,42 @@ const ComponentsSection: React.FC<ComponentsSectionProps> = ({ plugin, onOpenFil
 
   const total = hasSkills + hasAgents + hasHooks + hasMcps + hasCommands + hasLsps + hasOutputStyles;
 
+  // 如果没有任何内容且是远程源，显示提示
   if (total === 0) {
+    if (plugin.isRemoteSource && plugin.repository?.url) {
+      return (
+        <Space direction="vertical" size={12} style={{
+          padding: 16,
+          background: 'var(--vscode-editor-background)',
+          borderRadius: 8,
+          border: '1px solid var(--vscode-panel-border)',
+          width: '100%'
+        }}>
+          <Title level={5} style={{ margin: 0 }}>插件内容</Title>
+          <Alert
+            type="info"
+            icon={<InfoCircleOutlined />}
+            message="内容未解析"
+            description={
+              <span>
+                该插件尚未安装，无法获取详细的插件内容（Skills、Agents、Commands 等）。
+                安装后将显示完整信息。您可以在{' '}
+                <a
+                  href={plugin.repository.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--vscode-textLink-foreground)' }}
+                >
+                  GitHub 仓库
+                </a>
+                {' '}查看详细信息。
+              </span>
+            }
+            showIcon
+          />
+        </Space>
+      );
+    }
     return null;
   }
 

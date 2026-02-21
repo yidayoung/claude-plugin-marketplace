@@ -16,6 +16,7 @@ export type WebviewMessageType =
   | 'openExternal'
   | 'copyToClipboard'
   | 'openFile'
+  | 'openDirectory'
   | 'refresh'
   | 'addMarketplace'
   | 'removeMarketplace'
@@ -295,6 +296,10 @@ export interface PluginDetailData extends PluginData {
   repository?: RepositoryInfo;
   dependencies?: string[];
   license?: string;
+  // 是否为远程插件（未安装时无法获取完整内容）
+  isRemoteSource?: boolean;
+  // 本地插件路径（用于打开目录）
+  localPath?: string;
 }
 
 /**
