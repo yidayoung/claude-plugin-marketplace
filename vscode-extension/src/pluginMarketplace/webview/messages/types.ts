@@ -107,6 +107,7 @@ export interface PluginData {
   enabled?: boolean;
   scope?: 'user' | 'project' | 'local';
   updateAvailable?: boolean;
+  stars?: number;
 }
 
 /**

@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { execClaudeCommand, InstalledPlugin } from '../types';
 import { MarketplaceInfo, PluginInfo } from './types';
+import { PluginDetailData } from '../webview/messages/types';
 
 /**
  * 数据加载器
@@ -77,5 +78,35 @@ export class DataLoader {
       console.error(`[DataLoader] Failed to load plugins for ${marketplace.name}:`, error);
       return [];
     }
+  }
+
+  /**
+   * 获取插件详情（占位方法，将在 Task 9 中实现完整逻辑）
+   */
+  async getPluginDetail(
+    pluginName: string,
+    marketplace: string,
+    isInstalled: boolean
+  ): Promise<PluginDetailData> {
+    // TODO: 迁移自 PluginDetailsService 的逻辑
+    // 这里会调用 parseSkills, parseAgents 等方法
+    // 完整实现会在 Task 9 中从现有代码迁移
+    throw new Error('Plugin detail parsing not yet implemented - will be migrated in Task 9');
+  }
+
+  /**
+   * 获取 GitHub stars（异步，不阻塞）
+   */
+  async fetchGitHubStars(owner: string, repo: string): Promise<number> {
+    try {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+      if (response.ok) {
+        const data = (await response.json()) as { stargazers_count?: number };
+        return data.stargazers_count || 0;
+      }
+    } catch {
+      // 忽略错误
+    }
+    return 0;
   }
 }

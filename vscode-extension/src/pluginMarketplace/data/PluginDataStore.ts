@@ -6,10 +6,12 @@ import {
   MarketplaceInfo,
   PluginInfo,
   InstalledStatus,
+  DetailCacheEntry,
   StoreEvent,
 } from './types';
 import { storeEvents } from './events';
 import { execClaudeCommand } from '../types';
+import { PluginDetailData } from '../webview/messages/types';
 
 /**
  * 插件数据存储
@@ -20,6 +22,11 @@ export class PluginDataStore {
   private marketplaces = new Map<string, MarketplaceInfo>();
   private pluginList = new Map<string, PluginInfo[]>(); // marketplace -> plugins
   private installedStatus = new Map<string, InstalledStatus>(); // "name@marketplace" -> status
+  private pluginDetails = new Map<string, DetailCacheEntry>(); // "name@marketplace" -> detail
+  private pendingRequests = new Map<string, Promise<any>>();
+
+  // 缓存配置
+  private readonly DETAIL_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
 
   private dataLoader: DataLoader;
   private isInitialized = false;
@@ -239,5 +246,114 @@ export class PluginDataStore {
    */
   on(event: StoreEvent, callback: (...args: any[]) => void): vscode.Disposable {
     return storeEvents.onEvent(event, callback);
+  }
+
+  /**
+   * 获取插件详情（带缓存和请求去重）
+   */
+  async getPluginDetail(pluginName: string, marketplace: string): Promise<PluginDetailData> {
+    const key = `${pluginName}@${marketplace}`;
+
+    // 检查缓存
+    const cached = this.pluginDetails.get(key);
+    if (cached && Date.now() - cached.timestamp < this.DETAIL_CACHE_TTL) {
+      return cached.data;
+    }
+
+    // 检查是否有进行中的请求
+    if (this.pendingRequests.has(key)) {
+      return this.pendingRequests.get(key)!;
+    }
+
+    // 启动新请求
+    const promise = this.fetchPluginDetail(pluginName, marketplace);
+    this.pendingRequests.set(key, promise);
+
+    try {
+      const result = await promise;
+      return result;
+    } finally {
+      this.pendingRequests.delete(key);
+    }
+  }
+
+  /**
+   * 获取插件详情（实际加载逻辑）
+   */
+  private async fetchPluginDetail(
+    pluginName: string,
+    marketplace: string
+  ): Promise<PluginDetailData> {
+    const key = `${pluginName}@${marketplace}`;
+    const status = this.installedStatus.get(key);
+    const isInstalled = status?.installed ?? false;
+
+    const data = await this.dataLoader.getPluginDetail(pluginName, marketplace, isInstalled);
+
+    // 更新缓存
+    this.pluginDetails.set(key, {
+      data,
+      timestamp: Date.now(),
+    });
+
+    // 如果是 GitHub 插件，异步获取 stars
+    this.fetchStarsAsync(pluginName, marketplace, data);
+
+    return data;
+  }
+
+  /**
+   * 异步获取 stars
+   */
+  private fetchStarsAsync(pluginName: string, marketplace: string, data: PluginDetailData): void {
+    if (data.repository?.type !== 'github') {
+      return;
+    }
+
+    // 解析 GitHub 仓库
+    const url = data.repository.url;
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
+    if (!match) {
+      return;
+    }
+
+    const [, owner, repo] = match;
+
+    // 后台获取
+    this.dataLoader
+      .fetchGitHubStars(owner, repo.replace('.git', ''))
+      .then((stars) => {
+        // 更新缓存中的数据
+        const key = `${pluginName}@${marketplace}`;
+        const cached = this.pluginDetails.get(key);
+        if (cached) {
+          cached.data = { ...cached.data, stars };
+          // 发射更新事件
+          storeEvents.emitPluginDetailUpdate({
+            pluginName,
+            marketplace,
+            updates: { stars },
+          });
+        }
+      })
+      .catch((err) => {
+        console.error(`[PluginDataStore] Failed to fetch stars for ${pluginName}:`, err);
+      });
+  }
+
+  /**
+   * 使插件详情缓存失效
+   */
+  invalidatePluginDetail(pluginName: string, marketplace?: string): void {
+    if (marketplace) {
+      this.pluginDetails.delete(`${pluginName}@${marketplace}`);
+    } else {
+      // 清除所有市场的该插件缓存
+      for (const key of this.pluginDetails.keys()) {
+        if (key.startsWith(`${pluginName}@`)) {
+          this.pluginDetails.delete(key);
+        }
+      }
+    }
   }
 }
