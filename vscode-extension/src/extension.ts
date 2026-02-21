@@ -298,6 +298,7 @@ function registerPluginMarketplaceCommands(
       await PluginDetailsPanel.createOrShow(
         context.extensionUri,
         context,
+        dataStore!,
         pluginName,
         marketplaceName,
         isInstalled

@@ -3,6 +3,9 @@
 import * as vscode from 'vscode';
 import { PluginDetailsService } from './services/PluginDetailsService';
 import { PluginDataService } from './services/PluginDataService';
+import { PluginDataStore } from '../data/PluginDataStore';
+import { StoreEvent } from '../data/types';
+import { PluginDetailUpdateEvent, PluginStatusChangeEvent } from '../data/types';
 import { OpenFilePayload } from './messages/types';
 
 /**
@@ -17,6 +20,7 @@ export class PluginDetailsPanel {
   private readonly _extensionUri: vscode.Uri;
   private readonly _detailService: PluginDetailsService;
   private readonly _dataService: PluginDataService;
+  private readonly _dataStore: PluginDataStore;
   private _disposables: vscode.Disposable[] = [];
   private _webviewReady = false; // 跟踪 webview 是否已准备好
 
@@ -27,6 +31,7 @@ export class PluginDetailsPanel {
   public static async createOrShow(
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
+    dataStore: PluginDataStore,
     pluginName: string,
     marketplace: string,
     isInstalled: boolean
@@ -58,6 +63,7 @@ export class PluginDetailsPanel {
       panel,
       extensionUri,
       context,
+      dataStore,
       pluginName,
       marketplace,
       isInstalled
@@ -71,6 +77,7 @@ export class PluginDetailsPanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
+    dataStore: PluginDataStore,
     private _pluginName: string,
     private _marketplace: string,
     private _isInstalled: boolean
@@ -79,6 +86,32 @@ export class PluginDetailsPanel {
     this._extensionUri = extensionUri;
     this._detailService = new PluginDetailsService(context);
     this._dataService = new PluginDataService(context);
+    this._dataStore = dataStore;
+
+    // 订阅详情更新事件（如 stars 加载完成）
+    this._disposables.push(
+      this._dataStore.on(StoreEvent.PluginDetailUpdate, (event: PluginDetailUpdateEvent) => {
+        // 如果是当前显示的插件，发送更新到 webview
+        if (event.pluginName === this._pluginName && event.marketplace === this._marketplace) {
+          this.sendMessage({
+            type: 'detailUpdate',
+            payload: { updates: event.updates }
+          });
+        }
+      })
+    );
+
+    // 订阅状态变更事件
+    this._disposables.push(
+      this._dataStore.on(StoreEvent.PluginStatusChange, (event: PluginStatusChangeEvent) => {
+        if (event.pluginName === this._pluginName) {
+          this.sendMessage({
+            type: 'statusUpdate',
+            payload: { change: event.change }
+          });
+        }
+      })
+    );
 
     // 设置 HTML
     this._panel.webview.html = this._getHtmlForWebview();

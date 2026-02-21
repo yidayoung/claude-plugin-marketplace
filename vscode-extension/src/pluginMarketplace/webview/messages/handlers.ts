@@ -558,6 +558,7 @@ export class MessageHandler {
       await PluginDetailsPanel.createOrShow(
         this.extensionUri,
         context,
+        this.dataStore,
         pluginName,
         marketplace,
         isInstalled
