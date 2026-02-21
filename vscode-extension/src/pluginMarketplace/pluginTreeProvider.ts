@@ -166,24 +166,35 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
   }
 
   /**
+   * 创建插件树节点辅助函数
+   */
+  private createPluginTreeItem(
+    plugin: any,
+    marketplaceName: string,
+    type: 'installed' | 'available'
+  ): PluginTreeItem {
+    const item = new PluginTreeItem(
+      type === 'installed' ? 'installed-plugin' : 'available-plugin',
+      plugin.name,
+      vscode.TreeItemCollapsibleState.None,
+      { ...plugin, marketplaceName }
+    );
+
+    item.description = `v${plugin.version}`;
+    item.contextValue = type === 'installed'
+      ? (plugin.enabled ? 'installed-enabled' : 'installed-disabled')
+      : 'available-plugin';
+
+    return item;
+  }
+
+  /**
    * 获取已安装插件列表
    */
   private async getInstalledPluginsItems(): Promise<PluginTreeItem[]> {
-    const plugins = this.installedPluginsCache;
-
-    return plugins.map(plugin => {
-      const item = new PluginTreeItem(
-        'installed-plugin',
-        plugin.name,
-        vscode.TreeItemCollapsibleState.None,
-        { ...plugin }
-      );
-
-      item.description = `v${plugin.version}`;
-      item.contextValue = plugin.enabled ? 'installed-enabled' : 'installed-disabled';
-
-      return item;
-    });
+    return this.installedPluginsCache.map(p =>
+      this.createPluginTreeItem(p, p.marketplace || '', 'installed')
+    );
   }
 
   /**
@@ -192,22 +203,9 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
   private async getSectionInstalledItems(marketplaceName: string): Promise<PluginTreeItem[]> {
     try {
       const marketplacePlugins = this.dataStore.getPluginList(marketplaceName);
-
       return marketplacePlugins
         .filter(p => p.installed)
-        .map(plugin => {
-          const item = new PluginTreeItem(
-            'installed-plugin',
-            plugin.name,
-            vscode.TreeItemCollapsibleState.None,
-            { ...plugin, marketplaceName }
-          );
-
-          item.description = `v${plugin.version}`;
-          item.contextValue = plugin.enabled ? 'installed-enabled' : 'installed-disabled';
-
-          return item;
-        });
+        .map(p => this.createPluginTreeItem(p, marketplaceName, 'installed'));
     } catch (error) {
       console.error(`Failed to get installed items for ${marketplaceName}:`, error);
       return [];
@@ -220,22 +218,9 @@ export class PluginTreeProvider implements vscode.TreeDataProvider<PluginTreeIte
   private async getAvailablePluginsItems(marketplaceName: string): Promise<PluginTreeItem[]> {
     try {
       const marketplacePlugins = this.dataStore.getPluginList(marketplaceName);
-
       return marketplacePlugins
         .filter(p => !p.installed)
-        .map(plugin => {
-          const item = new PluginTreeItem(
-            'available-plugin',
-            plugin.name,
-            vscode.TreeItemCollapsibleState.None,
-            { ...plugin, marketplaceName }
-          );
-
-          item.description = plugin.version ? `v${plugin.version}` : '';
-          item.contextValue = 'available-plugin';
-
-          return item;
-        });
+        .map(p => this.createPluginTreeItem(p, marketplaceName, 'available'));
     } catch (error) {
       console.error(`Failed to get available plugins for ${marketplaceName}:`, error);
       return [];

@@ -52,25 +52,18 @@ export class PluginDataStore {
       this.dataLoader.loadInstalledPlugins(),
     ]);
 
-    // 存储市场列表
-    for (const market of marketplaces) {
-      this.marketplaces.set(market.name, market);
-    }
-
-    // 存储已安装插件状态
-    for (const plugin of installedPlugins) {
-      const key = `${plugin.name}@${plugin.marketplace}`;
+    // 使用 forEach 简化循环
+    marketplaces.forEach(m => this.marketplaces.set(m.name, m));
+    installedPlugins.forEach(p => {
+      const key = this.pluginKey(p.name, p.marketplace || '');
       this.installedStatus.set(key, {
         installed: true,
-        enabled: plugin.enabled ?? true,
-        scope: plugin.scope,
+        enabled: p.enabled ?? true,
+        scope: p.scope,
       });
-    }
+    });
 
-    // 加载所有市场的插件列表
     await this.loadAllPluginLists();
-
-    // 更新插件列表中的安装状态
     this.syncInstalledStatus();
 
     this.isInitialized = true;
@@ -158,75 +151,86 @@ export class PluginDataStore {
   }
 
   /**
+   * 生成插件缓存键
+   */
+  private pluginKey(pluginName: string, marketplace: string): string {
+    return `${pluginName}@${marketplace}`;
+  }
+
+  /**
+   * 通用插件操作执行器
+   */
+  private async executePluginOperation(
+    operation: 'install' | 'uninstall' | 'enable' | 'disable',
+    pluginName: string,
+    marketplace: string,
+    scope?: 'user' | 'project'
+  ): Promise<void> {
+    const commands = {
+      install: `plugin install "${pluginName}@${marketplace}" --${scope || 'user'}`,
+      uninstall: `plugin uninstall "${pluginName}"`,
+      enable: `plugin enable "${pluginName}@${marketplace}"`,
+      disable: `plugin disable "${pluginName}@${marketplace}"`
+    };
+
+    const statusChanges = {
+      install: { installed: true, enabled: true, scope },
+      uninstall: { installed: false, enabled: false },
+      enable: { enabled: true },
+      disable: { enabled: false }
+    };
+
+    const changeTypes = {
+      install: 'installed' as const,
+      uninstall: 'uninstalled' as const,
+      enable: 'enabled' as const,
+      disable: 'disabled' as const
+    };
+
+    await execClaudeCommand(commands[operation]);
+    this.updateInstalledStatus(pluginName, statusChanges[operation]);
+
+    // 对于 uninstall，需要找到市场名称
+    let effectiveMarketplace = marketplace;
+    if (operation === 'uninstall') {
+      effectiveMarketplace = marketplace || this.findPluginMarketplace(pluginName) || '';
+    }
+
+    if (effectiveMarketplace) {
+      storeEvents.emitPluginStatusChange({
+        pluginName,
+        marketplace: effectiveMarketplace,
+        change: changeTypes[operation],
+      });
+    }
+  }
+
+  /**
    * 安装插件
    */
   async installPlugin(pluginName: string, marketplace: string, scope: 'user' | 'project' = 'user'): Promise<void> {
-    await execClaudeCommand(`plugin install "${pluginName}@${marketplace}" --${scope}`);
-
-    // 更新缓存
-    this.updateInstalledStatus(pluginName, { installed: true, enabled: true, scope });
-
-    // 发射事件
-    storeEvents.emitPluginStatusChange({
-      pluginName,
-      marketplace,
-      change: 'installed',
-    });
+    return this.executePluginOperation('install', pluginName, marketplace, scope);
   }
 
   /**
    * 卸载插件
    */
   async uninstallPlugin(pluginName: string): Promise<void> {
-    await execClaudeCommand(`plugin uninstall "${pluginName}"`);
-
-    // 更新缓存
-    this.updateInstalledStatus(pluginName, { installed: false, enabled: false });
-
-    // 找到市场名称
-    const marketplace = this.findPluginMarketplace(pluginName);
-    if (marketplace) {
-      // 发射事件
-      storeEvents.emitPluginStatusChange({
-        pluginName,
-        marketplace,
-        change: 'uninstalled',
-      });
-    }
+    return this.executePluginOperation('uninstall', pluginName, '');
   }
 
   /**
    * 启用插件
    */
   async enablePlugin(pluginName: string, marketplace: string): Promise<void> {
-    await execClaudeCommand(`plugin enable "${pluginName}@${marketplace}"`);
-
-    // 更新缓存
-    this.updateInstalledStatus(pluginName, { enabled: true });
-
-    // 发射事件
-    storeEvents.emitPluginStatusChange({
-      pluginName,
-      marketplace,
-      change: 'enabled',
-    });
+    return this.executePluginOperation('enable', pluginName, marketplace);
   }
 
   /**
    * 禁用插件
    */
   async disablePlugin(pluginName: string, marketplace: string): Promise<void> {
-    await execClaudeCommand(`plugin disable "${pluginName}@${marketplace}"`);
-
-    // 更新缓存
-    this.updateInstalledStatus(pluginName, { enabled: false });
-
-    // 发射事件
-    storeEvents.emitPluginStatusChange({
-      pluginName,
-      marketplace,
-      change: 'disabled',
-    });
+    return this.executePluginOperation('disable', pluginName, marketplace);
   }
 
   /**
