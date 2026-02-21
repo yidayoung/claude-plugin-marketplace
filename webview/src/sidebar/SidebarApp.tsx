@@ -74,6 +74,7 @@ const SidebarApp: React.FC = () => {
   });
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['installed', 'available']));
+  const [hoveredItems, setHoveredItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadPlugins();
@@ -256,8 +257,7 @@ const SidebarApp: React.FC = () => {
 
   // 渲染插件项
   const renderPluginItem = (plugin: PluginData) => {
-    const [isHovered, setIsHovered] = useState(false);
-
+    const isHovered = hoveredItems.has(`plugin-${plugin.name}`);
     const statusIcon = plugin.updateAvailable
       ? <SyncOutlined style={{ color: '#faad14' }} />
       : plugin.enabled === false
@@ -332,11 +332,15 @@ const SidebarApp: React.FC = () => {
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = 'var(--vscode-list-hoverBackground)';
-          setIsHovered(true);
+          setHoveredItems(prev => new Set(prev).add(`plugin-${plugin.name}`));
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'transparent';
-          setIsHovered(false);
+          setHoveredItems(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(`plugin-${plugin.name}`);
+            return newSet;
+          });
         }}
       >
         <Flex align="center" gap={8}>
@@ -430,7 +434,7 @@ const SidebarApp: React.FC = () => {
     children: React.ReactNode,
     actions?: React.ReactNode
   ) => {
-    const [isHovered, setIsHovered] = useState(false);
+    const isHovered = hoveredItems.has(`section-${sectionKey}`);
     const isExpanded = expandedSections.has(sectionKey);
     return (
       <Space direction="vertical" size={4} style={{ width: '100%' }}>
@@ -451,11 +455,15 @@ const SidebarApp: React.FC = () => {
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--vscode-toolbar-hoverBackground)';
-            setIsHovered(true);
+            setHoveredItems(prev => new Set(prev).add(`section-${sectionKey}`));
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent';
-            setIsHovered(false);
+            setHoveredItems(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(`section-${sectionKey}`);
+              return newSet;
+            });
           }}
         >
           <span style={{ display: 'flex', alignItems: 'center', fontSize: 10 }}>

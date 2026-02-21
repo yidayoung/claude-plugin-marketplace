@@ -259,7 +259,7 @@ const DetailsApp: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 20, maxWidth: 1200, minWidth: 800, margin: '0 auto' }}>
       {/* 如果有插件数据但有错误，在顶部显示警告（不覆盖内容） */}
       {error && (
         <Alert

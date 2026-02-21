@@ -40,7 +40,9 @@ export class PluginDetailsPanel {
 
     // 如果已经存在详情面板，更新内容
     if (PluginDetailsPanel.currentPanel) {
-      PluginDetailsPanel.currentPanel._panel.reveal(column);
+      // 不传入 viewColumn 参数，让 panel 保持在原位置
+      // 这样可以避免每次打开时宽度变化
+      PluginDetailsPanel.currentPanel._panel.reveal();
       await PluginDetailsPanel.currentPanel.loadPluginDetail(pluginName, marketplace, isInstalled);
       return;
     }
