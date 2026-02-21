@@ -6,16 +6,18 @@ import { PluginTreeItem, PluginScope } from './pluginMarketplace/types';
 import { PluginDetailsPanel } from './pluginMarketplace/webview/PluginDetailsPanel';
 import { SidebarWebviewViewProvider } from './pluginMarketplace/webview/SidebarWebviewView';
 import { PluginDataService } from './pluginMarketplace/webview/services/PluginDataService';
+import { PluginDataStore } from './pluginMarketplace/data/PluginDataStore';
 
 // 插件市场全局变量
 let pluginManager: PluginManager | undefined;
 let sidebarProvider: SidebarWebviewViewProvider | undefined;
 let dataService: PluginDataService | undefined;
+let dataStore: PluginDataStore | undefined;
 
 /**
  * 扩展激活入口
  */
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   console.log('[Claude Plugin Marketplace] Extension is activating...');
 
   // 获取工作区根目录
@@ -32,6 +34,16 @@ export function activate(context: vscode.ExtensionContext): void {
   // ========== 初始化插件市场 ==========
 
   pluginManager = new PluginManager(context);
+
+  // 初始化数据存储
+  dataStore = new PluginDataStore(context);
+  await dataStore.initialize();
+
+  // 将 dataStore 存储在 context 中，供其他组件使用
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudePluginMarketplace.getDataStore', () => dataStore)
+  );
+
   dataService = new PluginDataService(context);
 
   // 检查 Claude Code 是否安装
