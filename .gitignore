@@ -63,3 +63,4 @@ webview/node_modules/
 # 构建缓存
 .cache/
 .parcel-cache/
+webview-app/node_modules
