@@ -43,24 +43,36 @@ export class PluginDetailsService {
    * 获取插件详情
    * 已安装插件从本地读取，未安装插件从市场源获取
    * 使用缓存提高重复访问的性能
+   * @param enabledFromStore 从 PluginDataStore 传递的启用状态（单一数据源）
+   * @param scopeFromStore 从 PluginDataStore 传递的作用域（单一数据源）
    */
   async getPluginDetail(
     pluginName: string,
     marketplace: string,
-    isInstalled: boolean
+    isInstalled: boolean,
+    enabledFromStore?: boolean,
+    scopeFromStore?: 'user' | 'project' | 'local'
   ): Promise<PluginDetailData> {
     const cacheKey = `${pluginName}@${marketplace}`;
 
-    // 检查缓存
+    // 检查缓存（注意：如果状态发生变化，需要清除缓存）
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      // 如果有从 Store 传递的状态，更新缓存数据
+      if (enabledFromStore !== undefined || scopeFromStore !== undefined) {
+        return {
+          ...cached.data,
+          enabled: enabledFromStore ?? cached.data.enabled,
+          scope: scopeFromStore ?? cached.data.scope,
+        };
+      }
       return cached.data;
     }
 
-    // 获取数据
+    // 获取数据，传递来自 Store 的状态
     const data = isInstalled
-      ? await this.getInstalledPluginDetail(pluginName, marketplace)
-      : await this.getRemotePluginDetail(pluginName, marketplace);
+      ? await this.getInstalledPluginDetail(pluginName, marketplace, enabledFromStore, scopeFromStore)
+      : await this.getRemotePluginDetail(pluginName, marketplace, enabledFromStore, scopeFromStore);
 
     // 更新缓存
     this.cache.set(cacheKey, {
@@ -181,13 +193,20 @@ export class PluginDetailsService {
   /**
    * 获取已安装插件的详情（从本地文件读取）
    * 如果本地找不到，会回退到远程获取
+   * @param enabledFromStore 从 PluginDataStore 传递的启用状态（单一数据源）
+   * @param scopeFromStore 从 PluginDataStore 传递的作用域（单一数据源）
    */
-  public async getInstalledPluginDetail(pluginName: string, marketplace: string): Promise<PluginDetailData> {
-    // 获取插件目录
-    const pluginPath = await this.getPluginPath(pluginName);
+  public async getInstalledPluginDetail(
+    pluginName: string,
+    marketplace: string,
+    enabledFromStore?: boolean,
+    scopeFromStore?: 'user' | 'project' | 'local'
+  ): Promise<PluginDetailData> {
+    // 获取插件目录（传递 marketplace 以精确匹配）
+    const pluginPath = await this.getPluginPath(pluginName, marketplace);
     if (!pluginPath) {
       // 本地找不到，回退到远程获取
-      console.log(`[PluginDetailsService] Plugin ${pluginName} not found locally, fetching from remote`);
+      console.log(`[PluginDetailsService] Plugin ${pluginName}@${marketplace} not found locally, fetching from remote`);
       return this.getRemotePluginDetail(pluginName, marketplace);
     }
 
@@ -219,21 +238,29 @@ export class PluginDetailsService {
       return this.getRemotePluginDetail(pluginName, marketplace);
     }
 
-    // 获取启用状态和作用域
-    const { CacheManager } = await import('./CacheManager');
-    const cache = new CacheManager(this.context);
-    const [installedPlugins, enabledMap] = await Promise.all([
-      cache.getInstalledPlugins(),
-      cache.getEnabledPlugins()
-    ]);
+    // 获取启用状态和作用域（如果从 Store 传递了，直接使用；否则从文件解析）
+    let enabled = enabledFromStore;
+    let scope = scopeFromStore;
+    let actualMarketplace = marketplace;
 
-    // 查找当前插件的安装信息
-    const installedInfo = installedPlugins.find(p => p.name === pluginName);
-    const key = `${pluginName}@${marketplace}`;
-    const isEnabled = enabledMap.get(key);
+    if (enabledFromStore === undefined || scopeFromStore === undefined) {
+      // 只有在 Store 没有传递状态时才从文件解析（保持兼容性）
+      const { FileParser } = await import('./FileParser');
+      const parser = new FileParser();
+      const [installedPlugins, enabledMap] = await Promise.all([
+        parser.parseInstalledPlugins(),
+        parser.parseEnabledPlugins()
+      ]);
 
-    // 使用安装信息中的实际市场名称，而不是 'installed'
-    const actualMarketplace = installedInfo?.marketplace || marketplace;
+      // 查找当前插件的安装信息 - 需要同时匹配插件名和市场名
+      const installedInfo = installedPlugins.find(p => p.name === pluginName && p.marketplace === marketplace);
+      const key = `${pluginName}@${marketplace}`;
+      const isEnabled = enabledMap.get(key);
+
+      enabled = enabledFromStore ?? isEnabled ?? true; // 优先使用 Store 传递的值
+      scope = scopeFromStore ?? installedInfo?.scope;
+      actualMarketplace = installedInfo?.marketplace || marketplace;
+    }
 
     return {
       name: configJson?.name || pluginName,
@@ -244,8 +271,8 @@ export class PluginDetailsService {
       category: configJson?.keywords?.[0],
       marketplace: actualMarketplace, // 使用实际的市场名称
       installed: true,
-      enabled: isEnabled ?? true, // 默认启用
-      scope: installedInfo?.scope,
+      enabled: enabled, // 使用从 Store 传递或解析的状态
+      scope: scope,
       readme,
       skills,
       agents,
@@ -288,18 +315,22 @@ export class PluginDetailsService {
 
   /**
    * 获取远程插件的详情（从市场源获取）
+   * @param enabledFromStore 从 PluginDataStore 传递的启用状态（单一数据源）
+   * @param scopeFromStore 从 PluginDataStore 传递的作用域（单一数据源）
    */
   public async getRemotePluginDetail(
     pluginName: string,
-    marketplace: string
+    marketplace: string,
+    enabledFromStore?: boolean,
+    scopeFromStore?: 'user' | 'project' | 'local'
   ): Promise<PluginDetailData> {
     const startTime = Date.now();
     console.log(`[PluginDetailsService] Loading remote plugin: ${pluginName}@${marketplace}`);
 
-    // 从缓存管理器获取市场信息
-    const { CacheManager } = await import('./CacheManager');
-    const cache = new CacheManager(this.context);
-    const marketplaces = await cache.getMarketplaces();
+    // 从文件解析器获取市场信息
+    const { FileParser } = await import('./FileParser');
+    const parser = new FileParser();
+    const marketplaces = await parser.parseMarketplaces();
     const market = marketplaces.find(m => m.name === marketplace);
 
     if (!market) {
@@ -307,8 +338,9 @@ export class PluginDetailsService {
     }
 
     // 获取插件列表找到目标插件
-    const plugins = await cache.getAllPlugins();
-    const plugin = plugins.find(p => p.name === pluginName && p.marketplace === marketplace);
+    const config = await parser.parseMarketplacePlugins(marketplace);
+    const plugins = config?.plugins || [];
+    const plugin = plugins.find(p => p.name === pluginName);
 
     if (!plugin) {
       throw new Error(`找不到插件 ${pluginName}@${marketplace}`);
@@ -435,6 +467,24 @@ export class PluginDetailsService {
     // 判断是否为远程源（本地没有完整解析的数据）
     const isRemoteSource = !localMarketPath || (skills.length === 0 && agents.length === 0 && commands.length === 0 && hooks.length === 0 && mcps.length === 0 && lsps.length === 0 && !readme);
 
+    // 检查实际的安装状态（只有在 Store 没有传递状态时才解析）
+    let enabled = enabledFromStore;
+    let scope = scopeFromStore;
+    let installed = false;
+
+    if (enabledFromStore === undefined || scopeFromStore === undefined) {
+      // 只有在 Store 没有传递状态时才从文件解析（保持兼容性）
+      const installedPlugins = await parser.parseInstalledPlugins();
+      const installedInfo = installedPlugins.find(p => p.name === pluginName && p.marketplace === marketplace);
+      const key = `${pluginName}@${marketplace}`;
+      const enabledMap = await parser.parseEnabledPlugins();
+      const isEnabled = enabledMap.get(key);
+
+      installed = !!installedInfo;
+      enabled = enabledFromStore ?? isEnabled ?? true; // 优先使用 Store 传递的值
+      scope = scopeFromStore ?? installedInfo?.scope;
+    }
+
     return {
       name: plugin.name,
       description: plugin.description,
@@ -443,7 +493,9 @@ export class PluginDetailsService {
       homepage: plugin.homepage,
       category: plugin.category,
       marketplace,
-      installed: false,
+      installed: installed,
+      enabled: enabled, // 使用从 Store 传递或解析的状态
+      scope: scope,
       readme,
       skills,
       agents,
@@ -466,8 +518,10 @@ export class PluginDetailsService {
    * 实际路径结构:
    * - ~/.claude/plugins/cache/{marketplace}/{pluginName}/{version}/
    * - ~/.claude/plugins/marketplaces/{marketplace}/plugins/{pluginName}/
+   * @param pluginName 插件名称
+   * @param marketplace 市场名称（用于精确匹配）
    */
-  public async getPluginPath(pluginName: string): Promise<string | null> {
+  public async getPluginPath(pluginName: string, marketplace?: string): Promise<string | null> {
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     const cacheBasePath = path.join(homeDir || '', '.claude', 'plugins', 'cache');
 
@@ -486,6 +540,11 @@ export class PluginDetailsService {
 
         for (const market of marketplaces) {
           if (!market.isDirectory()) continue;
+
+          // 如果指定了 marketplace，只搜索该市场
+          if (marketplace && market.name !== marketplace) {
+            continue;
+          }
 
           const marketPath = path.join(basePath, market.name);
 
@@ -659,9 +718,9 @@ export class PluginDetailsService {
    */
   async fetchPluginStarsAsync(pluginName: string, marketplace: string): Promise<number | null> {
     try {
-      const { CacheManager } = await import('./CacheManager');
-      const cache = new CacheManager(this.context);
-      const marketplaces = await cache.getMarketplaces();
+      const { FileParser } = await import('./FileParser');
+      const parser = new FileParser();
+      const marketplaces = await parser.parseMarketplaces();
       const market = marketplaces.find(m => m.name === marketplace);
 
       if (!market || market.source.source !== 'github' || !market.source.repo) {

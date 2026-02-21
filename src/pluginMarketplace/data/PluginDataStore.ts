@@ -56,6 +56,7 @@ export class PluginDataStore {
     marketplaces.forEach(m => this.marketplaces.set(m.name, m));
     installedPlugins.forEach(p => {
       const key = this.pluginKey(p.name, p.marketplace || '');
+      console.log('[PluginDataStore] Storing installed status:', key, 'enabled:', p.enabled, 'scope:', p.scope);
       this.installedStatus.set(key, {
         installed: true,
         enabled: p.enabled ?? true,
@@ -97,14 +98,19 @@ export class PluginDataStore {
    * 同步插件列表中的安装状态
    */
   private syncInstalledStatus(): void {
+    let matchedCount = 0;
     for (const [marketplace, plugins] of this.pluginList.entries()) {
       for (const plugin of plugins) {
         const key = `${plugin.name}@${marketplace}`;
         const status = this.installedStatus.get(key);
         if (status) {
+          console.log(`[PluginDataStore] Syncing ${key}: enabled=${status.enabled}, scope=${status.scope}`);
           plugin.installed = status.installed;
           plugin.enabled = status.enabled;
           plugin.scope = status.scope;
+          matchedCount++;
+        } else {
+          console.log(`[PluginDataStore] No status found for ${key}`);
         }
       }
     }
@@ -132,22 +138,42 @@ export class PluginDataStore {
   }
 
   /**
-   * 更新安装状态
+   * 获取扩展上下文（用于某些需要 context 的操作）
    */
-  private updateInstalledStatus(pluginName: string, status: Partial<InstalledStatus>): void {
-    // 查找该插件在哪个市场
-    for (const [marketplace, plugins] of this.pluginList.entries()) {
-      const plugin = plugins.find(p => p.name === pluginName);
-      if (plugin) {
-        const key = `${pluginName}@${marketplace}`;
-        const current = this.installedStatus.get(key) || { installed: false, enabled: true };
-        this.installedStatus.set(key, { ...current, ...status });
-        plugin.installed = status.installed ?? current.installed;
-        plugin.enabled = status.enabled ?? current.enabled;
-        plugin.scope = status.scope ?? current.scope;
-        break;
-      }
+  getContext(): vscode.ExtensionContext {
+    return this.context;
+  }
+
+  /**
+   * 更新安装状态
+   * @param pluginName 插件名称
+   * @param marketplace 市场名称
+   * @param status 状态更新
+   */
+  private updateInstalledStatus(pluginName: string, marketplace: string, status: Partial<InstalledStatus>): void {
+    const key = `${pluginName}@${marketplace}`;
+    const plugins = this.pluginList.get(marketplace);
+    if (!plugins) {
+      console.warn(`[PluginDataStore] Marketplace ${marketplace} not found when updating status for ${pluginName}`);
+      return;
     }
+
+    const plugin = plugins.find(p => p.name === pluginName);
+    if (!plugin) {
+      console.warn(`[PluginDataStore] Plugin ${pluginName} not found in marketplace ${marketplace}`);
+      return;
+    }
+
+    // 更新 installedStatus Map
+    const current = this.installedStatus.get(key) || { installed: false, enabled: true };
+    this.installedStatus.set(key, { ...current, ...status });
+
+    // 更新 pluginList 中的插件状态
+    plugin.installed = status.installed ?? current.installed;
+    plugin.enabled = status.enabled ?? current.enabled;
+    plugin.scope = status.scope ?? current.scope;
+
+    console.log(`[PluginDataStore] Updated status for ${pluginName}@${marketplace}:`, { ...current, ...status });
   }
 
   /**
@@ -164,7 +190,7 @@ export class PluginDataStore {
     operation: 'install' | 'uninstall' | 'enable' | 'disable',
     pluginName: string,
     marketplace: string,
-    scope?: 'user' | 'project'
+    scope?: 'user' | 'project' | 'local'
   ): Promise<void> {
     const commands = {
       install: `plugin install "${pluginName}@${marketplace}" --${scope || 'user'}`,
@@ -188,9 +214,9 @@ export class PluginDataStore {
     };
 
     await execClaudeCommand(commands[operation]);
-    this.updateInstalledStatus(pluginName, statusChanges[operation]);
+    this.updateInstalledStatus(pluginName, marketplace, statusChanges[operation]);
 
-    // 对于 uninstall，需要找到市场名称
+    // 对于 uninstall，可能需要查找市场名称（因为 uninstall 命令不需要 marketplace 参数）
     let effectiveMarketplace = marketplace;
     if (operation === 'uninstall') {
       effectiveMarketplace = marketplace || this.findPluginMarketplace(pluginName) || '';
@@ -208,7 +234,7 @@ export class PluginDataStore {
   /**
    * 安装插件
    */
-  async installPlugin(pluginName: string, marketplace: string, scope: 'user' | 'project' = 'user'): Promise<void> {
+  async installPlugin(pluginName: string, marketplace: string, scope: 'user' | 'project' | 'local' = 'user'): Promise<void> {
     return this.executePluginOperation('install', pluginName, marketplace, scope);
   }
 
@@ -292,7 +318,14 @@ export class PluginDataStore {
     const status = this.installedStatus.get(key);
     const isInstalled = status?.installed ?? false;
 
-    const data = await this.dataLoader.getPluginDetail(pluginName, marketplace, isInstalled);
+    // 从 Store 传递状态给 PluginDetailsService，确保使用单一数据源
+    const data = await this.dataLoader.getPluginDetail(
+      pluginName,
+      marketplace,
+      isInstalled,
+      status?.enabled,
+      status?.scope
+    );
 
     // 更新缓存
     this.pluginDetails.set(key, {
@@ -359,5 +392,136 @@ export class PluginDataStore {
         }
       }
     }
+  }
+
+  /**
+   * 检查 Claude Code 是否已安装
+   */
+  async checkClaudeInstalled(): Promise<boolean> {
+    const result = await execClaudeCommand('--version');
+    return result.status === 'success';
+  }
+
+  // ===== 市场管理方法 =====
+
+  /**
+   * 添加市场
+   * @param source 市场源（URL 或本地路径）
+   * @param name 市场名称（可选，CLI 会自动生成）
+   */
+  async addMarketplace(source: string, name?: string): Promise<{ success: boolean; error?: string; marketplaceName?: string }> {
+    try {
+      const command = name
+        ? `plugin marketplace add "${source}" --name "${name}"`
+        : `plugin marketplace add "${source}"`;
+
+      const result = await execClaudeCommand(command);
+
+      if (result.status !== 'success') {
+        return { success: false, error: result.error || '添加市场失败' };
+      }
+
+      // 重新加载市场列表
+      await this.reloadMarketplaces();
+
+      // 触发市场变更事件
+      storeEvents.emitMarketplaceChange();
+
+      // 获取实际的市场名称（CLI 可能会生成不同的名称）
+      const actualName = name || this.extractMarketplaceNameFromSource(source);
+      return { success: true, marketplaceName: actualName };
+    } catch (error: any) {
+      return { success: false, error: error.message || '添加市场失败' };
+    }
+  }
+
+  /**
+   * 移除市场
+   */
+  async removeMarketplace(name: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const result = await execClaudeCommand(`plugin marketplace remove "${name}"`);
+
+      if (result.status !== 'success') {
+        return { success: false, error: result.error || '移除市场失败' };
+      }
+
+      // 从缓存中移除
+      this.marketplaces.delete(name);
+      this.pluginList.delete(name);
+
+      // 清除该市场下所有插件的详情缓存
+      for (const key of this.pluginDetails.keys()) {
+        if (key.endsWith(`@${name}`)) {
+          this.pluginDetails.delete(key);
+        }
+      }
+
+      // 触发市场变更事件
+      storeEvents.emitMarketplaceChange();
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || '移除市场失败' };
+    }
+  }
+
+  /**
+   * 更新市场
+   */
+  async updateMarketplace(name: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const result = await execClaudeCommand(`plugin marketplace update "${name}`);
+
+      if (result.status !== 'success') {
+        return { success: false, error: result.error || '更新市场失败' };
+      }
+
+      // 重新加载市场列表和插件列表
+      await this.reloadMarketplaces();
+
+      // 清除该市场的插件详情缓存（因为可能有更新）
+      for (const key of this.pluginDetails.keys()) {
+        if (key.endsWith(`@${name}`)) {
+          this.pluginDetails.delete(key);
+        }
+      }
+
+      // 触发市场变更事件
+      storeEvents.emitMarketplaceChange();
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || '更新市场失败' };
+    }
+  }
+
+  /**
+   * 重新加载市场列表和插件列表
+   */
+  private async reloadMarketplaces(): Promise<void> {
+    // 重新加载市场列表
+    const marketplaces = await this.dataLoader.loadMarketplaces();
+    this.marketplaces.clear();
+    marketplaces.forEach(m => this.marketplaces.set(m.name, m));
+
+    // 重新加载插件列表
+    await this.loadAllPluginLists();
+
+    // 同步安装状态
+    this.syncInstalledStatus();
+  }
+
+  /**
+   * 从源提取市场名称（简单的启发式方法）
+   */
+  private extractMarketplaceNameFromSource(source: string): string {
+    if (source.includes('github.com')) {
+      const match = source.match(/github\.com\/([^/]+)/);
+      return match ? match[1] : source;
+    }
+    // 最后的路径部分作为名称
+    const parts = source.split(/[/\\]/);
+    return parts[parts.length - 1] || source;
   }
 }

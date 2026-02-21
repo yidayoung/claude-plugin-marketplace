@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "🔴 开发模式",
+      "name": "🔴 开发扩展 (Webview 热更新)",
       "type": "extensionHost",
       "request": "launch",
       "args": [
@@ -11,10 +11,39 @@
       "outFiles": [
         "${workspaceFolder}/out/**/*.js"
       ],
+      "preLaunchTask": "vscode: watch with webview",
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/out/**/*.js",
+        "${workspaceFolder}/node_modules/**/*.js"
+      ]
+    },
+    {
+      "name": "🔧 调试 Webview (自动附加)",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}/webview",
+      "timeout": 30000,
+      "presentation": {
+        "hidden": false,
+        "group": "webview"
+      }
+    },
+    {
+      "name": "🔴 复合调试 (扩展 + Webview 自动调试)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--inspect-extensions"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/out/**/*.js"
+      ],
       "preLaunchTask": "vscode: watch with webview"
     },
     {
-      "name": "✅ 生产模式",
+      "name": "✅ 生产模式 (完整构建)",
       "type": "extensionHost",
       "request": "launch",
       "args": [
@@ -26,17 +55,37 @@
       "preLaunchTask": "vscode: 全部构建"
     },
     {
-      "name": "🌐 Webview 开发服务器",
+      "name": "🧪 运行当前测试文件",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev-webview"],
-      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/node_modules/.bin/jest",
+      "args": [
+        "${fileBasenameNoExtension}",
+        "--config",
+        "jest.config.js",
+        "--no-coverage",
+        "--runInBand"
+      ],
       "console": "integratedTerminal",
-      "presentation": {
-        "hidden": false,
-        "group": "webview"
-      }
+      "windows": {
+        "program": "${workspaceFolder}/node_modules/jest/bin/jest"
+      },
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "🧪 调试所有测试",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/.bin/jest",
+      "args": [
+        "--runInBand",
+        "--no-cache"
+      ],
+      "console": "integratedTerminal",
+      "windows": {
+        "program": "${workspaceFolder}/node_modules/jest/bin/jest"
+      },
+      "internalConsoleOptions": "neverOpen"
     }
   ]
 }

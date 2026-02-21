@@ -1,17 +1,13 @@
 import * as vscode from 'vscode';
 
 // 导入插件市场相关
-import { PluginManager } from './pluginMarketplace/pluginManager';
 import { PluginScope } from './pluginMarketplace/types';
 import { PluginDetailsPanel } from './pluginMarketplace/webview/PluginDetailsPanel';
 import { SidebarWebviewViewProvider } from './pluginMarketplace/webview/SidebarWebviewView';
-import { PluginDataService } from './pluginMarketplace/webview/services/PluginDataService';
 import { PluginDataStore } from './pluginMarketplace/data/PluginDataStore';
 
 // 插件市场全局变量
-let pluginManager: PluginManager | undefined;
 let sidebarProvider: SidebarWebviewViewProvider | undefined;
-let dataService: PluginDataService | undefined;
 let dataStore: PluginDataStore | undefined;
 
 /**
@@ -33,9 +29,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // ========== 初始化插件市场 ==========
 
-  pluginManager = new PluginManager(context);
-
-  // 初始化数据存储
+  // 初始化数据存储（统一的数据管理单例）
   dataStore = new PluginDataStore(context);
   await dataStore.initialize();
 
@@ -44,10 +38,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('claudePluginMarketplace.getDataStore', () => dataStore)
   );
 
-  dataService = new PluginDataService(context);
-
   // 检查 Claude Code 是否安装
-  pluginManager.checkClaudeInstalled().then((installed: boolean) => {
+  dataStore.checkClaudeInstalled().then((installed: boolean) => {
     if (!installed) {
       vscode.window.showWarningMessage(
         '未检测到 Claude Code CLI，插件市场功能将不可用。请安装 Claude Code: https://claude.ai/download',
@@ -60,12 +52,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   });
 
-  // 注册侧边栏 WebviewViewProvider
-  sidebarProvider = new SidebarWebviewViewProvider(context.extensionUri, dataService, dataStore!);
+  // 注册侧边栏 WebviewViewProvider（不再需要 PluginDataService）
+  sidebarProvider = new SidebarWebviewViewProvider(context.extensionUri, dataStore!);
   vscode.window.registerWebviewViewProvider('claudePluginMarketplaceSidebar', sidebarProvider);
 
   // 注册命令
-  registerPluginMarketplaceCommands(context, sidebarProvider, dataService);
+  registerPluginMarketplaceCommands(context, sidebarProvider, dataStore!);
 
   console.log('[Claude Plugin Marketplace] Extension activated successfully');
 }
@@ -79,11 +71,12 @@ export function deactivate(): void {
 
 /**
  * 注册插件市场相关命令
+ * 所有数据操作通过 PluginDataStore 统一管理
  */
 function registerPluginMarketplaceCommands(
   context: vscode.ExtensionContext,
   sidebarProvider: SidebarWebviewViewProvider,
-  dataService: PluginDataService
+  dataStore: PluginDataStore
 ) {
   // 刷新命令
   context.subscriptions.push(
@@ -92,7 +85,7 @@ function registerPluginMarketplaceCommands(
     })
   );
 
-  // 添加市场命令
+  // 添加市场命令（使用 PluginDataStore）
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.addMarketplace', async () => {
       const source = await vscode.window.showInputBox({
@@ -102,10 +95,9 @@ function registerPluginMarketplaceCommands(
       });
 
       if (source) {
-        const result = await dataService.addMarketplace(source);
+        const result = await dataStore.addMarketplace(source);
         if (result.success) {
-          vscode.window.showInformationMessage(`✅ 市场 ${source} 添加成功`);
-          sidebarProvider.refreshData();
+          vscode.window.showInformationMessage(`✅ 市场 ${result.marketplaceName || source} 添加成功`);
         } else {
           vscode.window.showErrorMessage(`❌ 添加市场失败: ${result.error}`);
         }
@@ -113,7 +105,7 @@ function registerPluginMarketplaceCommands(
     })
   );
 
-  // 删除市场命令
+  // 删除市场命令（使用 PluginDataStore）
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.removeMarketplace', async (marketplaceName: string) => {
     if (!marketplaceName) {
@@ -128,10 +120,9 @@ function registerPluginMarketplaceCommands(
     );
 
     if (confirm === '确认') {
-      const result = await dataService.removeMarketplace(marketplaceName);
+      const result = await dataStore.removeMarketplace(marketplaceName);
       if (result.success) {
         vscode.window.showInformationMessage(`✅ 市场 ${marketplaceName} 删除成功`);
-        sidebarProvider.refreshData();
       } else {
         vscode.window.showErrorMessage(`❌ 删除市场失败: ${result.error}`);
       }
@@ -139,24 +130,23 @@ function registerPluginMarketplaceCommands(
   })
   );
 
-  // 刷新市场命令
+  // 刷新市场命令（使用 PluginDataStore）
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.refreshMarketplace', async (marketplaceName: string) => {
       if (!marketplaceName) {
         return;
       }
 
-      const result = await dataService.updateMarketplace(marketplaceName);
+      const result = await dataStore.updateMarketplace(marketplaceName);
       if (result.success) {
         vscode.window.showInformationMessage(`✅ 市场 ${marketplaceName} 更新成功`);
-        sidebarProvider.refreshData();
       } else {
         vscode.window.showErrorMessage(`❌ 更新市场失败: ${result.error}`);
       }
     })
   );
 
-  // 安装插件命令
+  // 安装插件命令（使用 PluginDataStore）
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.installPlugin', async (item: { name?: string; marketplace?: string; plugin?: { name?: string; marketplace?: string } }) => {
       const pluginName = item.name || item.plugin?.name;
@@ -177,18 +167,17 @@ function registerPluginMarketplaceCommands(
       });
 
       if (scope) {
-        const result = await dataService.installPlugin(pluginName, marketplaceName, scope.label as PluginScope);
-        if (result.success) {
+        try {
+          await dataStore.installPlugin(pluginName, marketplaceName, scope.label as PluginScope);
           vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 安装成功`);
-          sidebarProvider.refreshData();
-        } else {
-          vscode.window.showErrorMessage(`❌ 安装失败: ${result.error}`);
+        } catch (error: any) {
+          vscode.window.showErrorMessage(`❌ 安装失败: ${error.message || '未知错误'}`);
         }
       }
     })
   );
 
-  // 卸载插件命令
+  // 卸载插件命令（使用 PluginDataStore）
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.uninstallPlugin', async (item: { name?: string; plugin?: { name?: string } }) => {
       const pluginName = item.name || item.plugin?.name;
@@ -205,18 +194,17 @@ function registerPluginMarketplaceCommands(
       );
 
       if (confirm === '确认') {
-        const result = await dataService.uninstallPlugin(pluginName);
-        if (result.success) {
+        try {
+          await dataStore.uninstallPlugin(pluginName);
           vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 卸载成功`);
-          sidebarProvider.refreshData();
-        } else {
-          vscode.window.showErrorMessage(`❌ 卸载失败: ${result.error}`);
+        } catch (error: any) {
+          vscode.window.showErrorMessage(`❌ 卸载失败: ${error.message || '未知错误'}`);
         }
       }
     })
   );
 
-  // 启用插件命令
+  // 启用插件命令（使用 PluginDataStore）
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.enablePlugin', async (item: { name?: string; marketplace?: string; plugin?: { name?: string; marketplace?: string } }) => {
       const pluginName = item.name || item.plugin?.name;
@@ -226,17 +214,16 @@ function registerPluginMarketplaceCommands(
         return;
       }
 
-      const result = await dataService.enablePlugin(pluginName, marketplaceName);
-      if (result.success) {
+      try {
+        await dataStore.enablePlugin(pluginName, marketplaceName);
         vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已启用`);
-        sidebarProvider.refreshData();
-      } else {
-        vscode.window.showErrorMessage(`❌ 启用失败: ${result.error}`);
+      } catch (error: any) {
+        vscode.window.showErrorMessage(`❌ 启用失败: ${error.message || '未知错误'}`);
       }
     })
   );
 
-  // 禁用插件命令
+  // 禁用插件命令（使用 PluginDataStore）
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.disablePlugin', async (item: { name?: string; marketplace?: string; plugin?: { name?: string; marketplace?: string } }) => {
       const pluginName = item.name || item.plugin?.name;
@@ -246,17 +233,16 @@ function registerPluginMarketplaceCommands(
         return;
       }
 
-      const result = await dataService.disablePlugin(pluginName, marketplaceName);
-      if (result.success) {
+      try {
+        await dataStore.disablePlugin(pluginName, marketplaceName);
         vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已禁用`);
-        sidebarProvider.refreshData();
-      } else {
-        vscode.window.showErrorMessage(`❌ 禁用失败: ${result.error}`);
+      } catch (error: any) {
+        vscode.window.showErrorMessage(`❌ 禁用失败: ${error.message || '未知错误'}`);
       }
     })
   );
 
-  // 更新插件命令
+  // 更新插件命令（使用 PluginDataStore）
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.updatePlugin', async (item: { name?: string; marketplace?: string; plugin?: { name?: string; marketplace?: string } }) => {
       const pluginName = item.name || item.plugin?.name;
@@ -266,20 +252,13 @@ function registerPluginMarketplaceCommands(
         return;
       }
 
-      // 先卸载再安装
-      const uninstallResult = await dataService.uninstallPlugin(pluginName);
-      if (!uninstallResult.success) {
-        vscode.window.showErrorMessage(`❌ 更新失败: ${uninstallResult.error}`);
-        return;
-      }
-
-      // TypeScript 类型守卫确保此时 marketplaceName 不是 undefined
-      const installResult = await dataService.installPlugin(pluginName, marketplaceName!, 'user');
-      if (installResult.success) {
+      try {
+        // 先卸载再安装
+        await dataStore.uninstallPlugin(pluginName);
+        await dataStore.installPlugin(pluginName, marketplaceName, 'user');
         vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 更新成功`);
-        sidebarProvider.refreshData();
-      } else {
-        vscode.window.showErrorMessage(`❌ 更新失败: ${installResult.error}`);
+      } catch (error: any) {
+        vscode.window.showErrorMessage(`❌ 更新失败: ${error.message || '未知错误'}`);
       }
     })
   );

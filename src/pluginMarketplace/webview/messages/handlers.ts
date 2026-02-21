@@ -1,7 +1,6 @@
 // vscode-extension/src/pluginMarketplace/webview/messages/handlers.ts
 
 import * as vscode from 'vscode';
-import { PluginDataService } from '../services/PluginDataService';
 import { PluginDataStore } from '../../data/PluginDataStore';
 import {
   WebviewMessage,
@@ -24,11 +23,11 @@ import {
 /**
  * Webview 消息处理器
  * 负责处理 Webview 和 Extension 之间的所有消息通信
+ * 所有数据操作通过 PluginDataStore 单例进行
  */
 export class MessageHandler {
   constructor(
     private webview: vscode.Webview,
-    private dataService: PluginDataService,
     private dataStore: PluginDataStore,
     private extensionUri: vscode.Uri
   ) {}
@@ -105,58 +104,63 @@ export class MessageHandler {
   /**
    * 获取插件列表
    * 支持关键字、状态、市场等筛选条件
+   * 使用 PluginDataStore 统一数据源
    */
   private async handleGetPlugins(payload: GetPluginsPayload = {}): Promise<void> {
     try {
-      // 获取所有可用插件
-      const allPlugins = await this.dataService.getAllAvailablePlugins();
-      const marketplaces = await this.dataService.getAllMarketplaces();
+      // 从 PluginDataStore 获取插件列表（已经包含安装状态）
+      const allPlugins = this.dataStore.getPluginList();
+      const marketplaces = this.dataStore.getMarketplaces();
 
-      // 获取已安装插件列表
-      const installedPlugins = await this.dataService.getInstalledPlugins();
-      // 使用组合键 "name@marketplace" 来精确匹配安装状态
-      const installedKeys = new Set(
-        installedPlugins.map(ip => `${ip.name}@${ip.marketplace}`)
-      );
-
-      // 更新所有插件的安装状态
-      const pluginsWithStatus = await Promise.all(
-        allPlugins.map(async (plugin) => {
-          const pluginKey = `${plugin.name}@${plugin.marketplace}`;
-          if (installedKeys.has(pluginKey)) {
-            // 已安装，获取详细状态（传入 marketplace 以精确匹配）
-            const status = await this.dataService.getPluginStatus(plugin.name, plugin.marketplace);
-            return {
-              ...plugin,
-              status
-            };
-          } else {
-            // 未安装，保持原样
-            return plugin;
-          }
-        })
-      );
+      console.log('[MessageHandler] getPlugins - Total plugins:', allPlugins.length, 'Installed:', allPlugins.filter(p => p.installed).length);
 
       // 筛选插件
-      const filteredPlugins = this.dataService.filterPlugins(pluginsWithStatus, {
-        keyword: payload.filter?.keyword,
-        status: payload.filter?.status,
-        marketplace: payload.filter?.marketplace
-      });
+      let filteredPlugins = allPlugins;
+
+      // 关键字筛选
+      if (payload.filter?.keyword) {
+        const keyword = payload.filter.keyword.toLowerCase();
+        filteredPlugins = filteredPlugins.filter(plugin =>
+          plugin.name.toLowerCase().includes(keyword) ||
+          plugin.description.toLowerCase().includes(keyword)
+        );
+      }
+
+      // 市场筛选
+      if (payload.filter?.marketplace && payload.filter.marketplace !== 'all') {
+        filteredPlugins = filteredPlugins.filter(plugin => plugin.marketplace === payload.filter?.marketplace);
+      }
+
+      // 状态筛选
+      if (payload.filter?.status && payload.filter.status !== 'all') {
+        filteredPlugins = filteredPlugins.filter(plugin => {
+          switch (payload.filter?.status) {
+            case 'installed':
+              return plugin.installed;
+            case 'not-installed':
+              return !plugin.installed;
+            case 'upgradable':
+              // TODO: 实现版本比较逻辑
+              return false;
+            default:
+              return true;
+          }
+        });
+      }
 
       // 转换为 UI 格式
       const pluginData: PluginData[] = filteredPlugins.map(p => ({
         name: p.name,
         description: p.description,
         version: p.version,
-        author: p.author?.name,
+        author: p.author,
         homepage: p.homepage,
         category: p.category,
         marketplace: p.marketplace,
-        installed: p.status.installed,
-        enabled: p.status.enabled,
-        scope: p.status.scope,
-        updateAvailable: p.status.updateAvailable
+        installed: p.installed,
+        enabled: p.enabled,
+        scope: p.scope,
+        updateAvailable: false // TODO: 实现版本比较
       }));
 
       const responsePayload: PluginsPayload = {
@@ -320,6 +324,7 @@ export class MessageHandler {
 
   /**
    * 添加市场
+   * 使用 PluginDataStore 统一管理，会自动触发 MarketplaceChange 事件
    */
   private async handleAddMarketplace(payload: AddMarketplacePayload): Promise<void> {
     const { source } = payload;
@@ -332,15 +337,16 @@ export class MessageHandler {
       },
       async () => {
         try {
-          const result = await this.dataService.addMarketplace(source);
+          // 使用 PluginDataStore 添加市场（会自动发射事件）
+          const result = await this.dataStore.addMarketplace(source);
 
           if (result.success) {
             this.sendMessage({
               type: 'marketplaceSuccess',
-              payload: { action: 'add', source }
+              payload: { action: 'add', source, name: result.marketplaceName }
             });
 
-            vscode.window.showInformationMessage(`✅ 市场 ${source} 添加成功`);
+            vscode.window.showInformationMessage(`✅ 市场 ${result.marketplaceName || source} 添加成功`);
           } else {
             this.sendMessage({
               type: 'marketplaceError',
@@ -364,6 +370,7 @@ export class MessageHandler {
 
   /**
    * 删除市场
+   * 使用 PluginDataStore 统一管理，会自动触发 MarketplaceChange 事件
    */
   private async handleRemoveMarketplace(payload: RemoveMarketplacePayload): Promise<void> {
     const { name } = payload;
@@ -388,7 +395,8 @@ export class MessageHandler {
       },
       async () => {
         try {
-          const result = await this.dataService.removeMarketplace(name);
+          // 使用 PluginDataStore 删除市场（会自动发射事件）
+          const result = await this.dataStore.removeMarketplace(name);
 
           if (result.success) {
             this.sendMessage({
@@ -420,6 +428,7 @@ export class MessageHandler {
 
   /**
    * 更新市场
+   * 使用 PluginDataStore 统一管理，会自动触发 MarketplaceChange 事件
    */
   private async handleUpdateMarketplace(payload: UpdateMarketplacePayload): Promise<void> {
     const { name } = payload;
@@ -432,7 +441,8 @@ export class MessageHandler {
       },
       async () => {
         try {
-          const result = await this.dataService.updateMarketplace(name);
+          // 使用 PluginDataStore 更新市场（会自动发射事件）
+          const result = await this.dataStore.updateMarketplace(name);
 
           if (result.success) {
             this.sendMessage({
@@ -464,11 +474,10 @@ export class MessageHandler {
 
   /**
    * 刷新插件列表
+   * 直接重新获取数据，不再需要清除缓存
    */
   private async handleRefresh(): Promise<void> {
     try {
-      // 清除缓存以确保获取最新数据
-      this.dataService.clearCache();
       await this.handleGetPlugins({});
     } catch (error: any) {
       this.sendMessage({
@@ -481,6 +490,7 @@ export class MessageHandler {
   /**
    * 更新插件
    * 先卸载再安装最新版本
+   * 使用 PluginDataStore 统一管理，会自动触发事件
    */
   private async handleUpdatePlugin(payload: UpdatePluginPayload): Promise<void> {
     const { pluginName, marketplace } = payload;
@@ -494,16 +504,10 @@ export class MessageHandler {
       async () => {
         try {
           // 先卸载
-          const uninstallResult = await this.dataService.uninstallPlugin(pluginName);
-          if (!uninstallResult.success) {
-            throw new Error(uninstallResult.error || '卸载失败');
-          }
+          await this.dataStore.uninstallPlugin(pluginName);
 
           // 再安装
-          const installResult = await this.dataService.installPlugin(pluginName, marketplace, 'user');
-          if (!installResult.success) {
-            throw new Error(installResult.error || '安装失败');
-          }
+          await this.dataStore.installPlugin(pluginName, marketplace, 'user');
 
           this.sendMessage({
             type: 'installSuccess',
@@ -542,13 +546,13 @@ export class MessageHandler {
       // 动态导入 PluginDetailsPanel
       const { PluginDetailsPanel } = await import('../PluginDetailsPanel');
 
-      // 检查插件是否已安装
-      const allPlugins = await this.dataService.getAllAvailablePlugins();
+      // 从 PluginDataStore 检查插件是否已安装
+      const allPlugins = this.dataStore.getPluginList();
       const plugin = allPlugins.find(p => p.name === pluginName && p.marketplace === marketplace);
-      const isInstalled = plugin?.status.installed || false;
+      const isInstalled = plugin?.installed || false;
 
       // 获取扩展上下文
-      const context = this.dataService.getContext();
+      const context = this.dataStore.getContext();
       if (!context) {
         vscode.window.showErrorMessage('无法打开详情页：缺少扩展上下文');
         return;

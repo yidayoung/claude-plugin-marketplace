@@ -27,7 +27,22 @@
         "kind": "build",
         "isDefault": false
       },
-      "detail": "并行任务：监听 Extension 代码变化 + Webview 热更新"
+      "detail": "并行任务：监听 Extension 代码变化 + 初始构建 Webview"
+    },
+    {
+      "label": "vscode: watch with webview dev server",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "webview: dev server",
+        "vscode: watch"
+      ],
+      "problemMatcher": [],
+      "isBackground": true,
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "detail": "并行任务：监听 Extension 代码 + Webview Vite 热更新服务器"
     },
     {
       "type": "npm",
@@ -66,7 +81,8 @@
       "isBackground": true,
       "presentation": {
         "reveal": "always",
-        "panel": "dedicated"
+        "panel": "dedicated",
+        "group": "webview"
       },
       "label": "webview: dev server",
       "detail": "启动 Vite 开发服务器（热更新）"

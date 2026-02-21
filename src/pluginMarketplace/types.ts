@@ -83,7 +83,8 @@ export async function execClaudeCommand(
       `claude ${command}`,
       {
         timeout: options?.timeout || 60000,
-        cwd: options?.cwd
+        cwd: options?.cwd,
+        shell: true as any  // 使用 shell 来执行命令，确保 claude 命令能被找到
       }
     );
 

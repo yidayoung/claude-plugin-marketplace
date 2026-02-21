@@ -126,6 +126,26 @@ const DetailsApp: React.FC = () => {
             return prev;
           });
           break;
+        case 'statusUpdate':
+          console.log('[DetailsApp] Status update received:', message.payload);
+          // 根据变更类型更新插件状态
+          setPlugin(prev => {
+            if (!prev) return prev;
+            const change = message.payload.change;
+            switch (change) {
+              case 'enabled':
+                return { ...prev, enabled: true };
+              case 'disabled':
+                return { ...prev, enabled: false };
+              case 'installed':
+                return { ...prev, installed: true };
+              case 'uninstalled':
+                return { ...prev, installed: false };
+              default:
+                return prev;
+            }
+          });
+          break;
         case 'error':
           setError(message.payload.message);
           setLoading(false);

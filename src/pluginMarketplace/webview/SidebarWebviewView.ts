@@ -1,9 +1,10 @@
 // vscode-extension/src/pluginMarketplace/webview/SidebarWebviewView.ts
 
 import * as vscode from 'vscode';
-import { PluginDataService } from './services/PluginDataService';
 import { PluginDataStore } from '../data/PluginDataStore';
 import { MessageHandler } from './messages/handlers';
+import { StoreEvent } from '../data/types';
+import { PluginStatusChangeEvent } from '../data/types';
 
 /**
  * 侧边栏 WebviewView Provider
@@ -13,16 +14,14 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'claudePluginMarketplaceSidebar';
 
   private _view?: vscode.WebviewView;
-  private _dataService: PluginDataService;
   private _dataStore: PluginDataStore;
   private _messageHandler?: MessageHandler;
+  private _disposables: vscode.Disposable[] = [];
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    dataService: PluginDataService,
     dataStore: PluginDataStore
   ) {
-    this._dataService = dataService;
     this._dataStore = dataStore;
   }
 
@@ -48,8 +47,26 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
     // 设置 HTML
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-    // 创建消息处理器
-    this._messageHandler = new MessageHandler(webviewView.webview, this._dataService, this._dataStore, this._extensionUri);
+    // 创建消息处理器（不再需要 PluginDataService）
+    this._messageHandler = new MessageHandler(webviewView.webview, this._dataStore, this._extensionUri);
+
+    // 监听插件状态变更事件
+    this._disposables.push(
+      this._dataStore.on(StoreEvent.PluginStatusChange, (event: PluginStatusChangeEvent) => {
+        console.log('[SidebarWebviewView] Plugin status changed:', event);
+        // 刷新侧边栏数据
+        this.refreshData();
+      })
+    );
+
+    // 监听市场变更事件
+    this._disposables.push(
+      this._dataStore.on(StoreEvent.MarketplaceChange, () => {
+        console.log('[SidebarWebviewView] Marketplace changed, refreshing data');
+        // 刷新侧边栏数据
+        this.refreshData();
+      })
+    );
 
     // 监听消息
     webviewView.webview.onDidReceiveMessage(
@@ -67,6 +84,11 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
         // 侧边栏显示时刷新数据
         this.refreshData();
       }
+    });
+
+    // 监听 webview 销毁事件，清理订阅
+    webviewView.onDidDispose(() => {
+      this.dispose();
     });
   }
 
@@ -88,6 +110,18 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
   public postMessage(message: any): void {
     if (this._view) {
       this._view.webview.postMessage(message);
+    }
+  }
+
+  /**
+   * 释放资源
+   */
+  public dispose(): void {
+    while (this._disposables.length) {
+      const disposable = this._disposables.pop();
+      if (disposable) {
+        disposable.dispose();
+      }
     }
   }
 
