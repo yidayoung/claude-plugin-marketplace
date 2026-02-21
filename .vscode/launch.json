@@ -6,10 +6,10 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/vscode-extension"
+        "--extensionDevelopmentPath=${workspaceFolder}"
       ],
       "outFiles": [
-        "${workspaceFolder}/vscode-extension/out/**/*.js"
+        "${workspaceFolder}/out/**/*.js"
       ],
       "preLaunchTask": "vscode: watch with webview"
     },
@@ -18,10 +18,10 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/vscode-extension"
+        "--extensionDevelopmentPath=${workspaceFolder}"
       ],
       "outFiles": [
-        "${workspaceFolder}/vscode-extension/out/**/*.js"
+        "${workspaceFolder}/out/**/*.js"
       ],
       "preLaunchTask": "vscode: 全部构建"
     },
@@ -31,7 +31,7 @@
       "request": "launch",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev-webview"],
-      "cwd": "${workspaceFolder}/vscode-extension",
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "presentation": {
         "hidden": false,

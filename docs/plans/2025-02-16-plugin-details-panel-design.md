@@ -26,7 +26,7 @@
 ### 文件结构
 
 ```
-vscode-extension/src/pluginMarketplace/webview/
+src/pluginMarketplace/webview/
 ├── PluginMarketplacePanel.ts    (现有 - 市场列表)
 ├── PluginDetailsPanel.ts        (新增 - 插件详情)
 ├── SidebarWebviewView.ts        (现有 - 侧边栏视图)

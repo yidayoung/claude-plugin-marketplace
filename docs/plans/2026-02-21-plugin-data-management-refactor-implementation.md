@@ -13,13 +13,13 @@
 ## Task 1: 创建核心数据结构和事件定义
 
 **Files:**
-- Create: `vscode-extension/src/pluginMarketplace/data/types.ts`
-- Create: `vscode-extension/src/pluginMarketplace/data/events.ts`
+- Create: `src/pluginMarketplace/data/types.ts`
+- Create: `src/pluginMarketplace/data/events.ts`
 
 **Step 1: 创建数据类型定义文件**
 
 ```typescript
-// vscode-extension/src/pluginMarketplace/data/types.ts
+// src/pluginMarketplace/data/types.ts
 
 import { PluginDetailData } from '../webview/messages/types';
 
@@ -87,7 +87,7 @@ export interface PluginDetailUpdateEvent {
 **Step 2: 创建事件发射器类**
 
 ```typescript
-// vscode-extension/src/pluginMarketplace/data/events.ts
+// src/pluginMarketplace/data/events.ts
 
 import { EventEmitter } from 'events';
 import { Disposable } from 'vscode';
@@ -133,7 +133,7 @@ Expected: Success, no type errors
 **Step 4: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/data/types.ts vscode-extension/src/pluginMarketplace/data/events.ts
+git add src/pluginMarketplace/data/types.ts src/pluginMarketplace/data/events.ts
 git commit -m "feat: add data types and event system for plugin store refactor"
 ```
 
@@ -142,12 +142,12 @@ git commit -m "feat: add data types and event system for plugin store refactor"
 ## Task 2: 创建 DataLoader - 数据加载器
 
 **Files:**
-- Create: `vscode-extension/src/pluginMarketplace/data/DataLoader.ts`
+- Create: `src/pluginMarketplace/data/DataLoader.ts`
 
 **Step 1: 编写 DataLoader 基础结构和市场加载方法**
 
 ```typescript
-// vscode-extension/src/pluginMarketplace/data/DataLoader.ts
+// src/pluginMarketplace/data/DataLoader.ts
 
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -244,7 +244,7 @@ Expected: Success
 **Step 4: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/data/DataLoader.ts
+git add src/pluginMarketplace/data/DataLoader.ts
 git commit -m "feat: add DataLoader with marketplace and plugin list loading"
 ```
 
@@ -253,12 +253,12 @@ git commit -m "feat: add DataLoader with marketplace and plugin list loading"
 ## Task 3: 创建 PluginDataStore 核心类
 
 **Files:**
-- Create: `vscode-extension/src/pluginMarketplace/data/PluginDataStore.ts`
+- Create: `src/pluginMarketplace/data/PluginDataStore.ts`
 
 **Step 1: 编写 PluginDataStore 基础结构**
 
 ```typescript
-// vscode-extension/src/pluginMarketplace/data/PluginDataStore.ts
+// src/pluginMarketplace/data/PluginDataStore.ts
 
 import * as vscode from 'vscode';
 import { DataLoader } from './DataLoader';
@@ -518,7 +518,7 @@ Expected: Success
 **Step 3: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/data/PluginDataStore.ts
+git add src/pluginMarketplace/data/PluginDataStore.ts
 git commit -m "feat: add PluginDataStore with basic functionality"
 ```
 
@@ -527,8 +527,8 @@ git commit -m "feat: add PluginDataStore with basic functionality"
 ## Task 4: 实现插件详情加载和缓存
 
 **Files:**
-- Modify: `vscode-extension/src/pluginMarketplace/data/PluginDataStore.ts`
-- Modify: `vscode-extension/src/pluginMarketplace/data/DataLoader.ts`
+- Modify: `src/pluginMarketplace/data/PluginDataStore.ts`
+- Modify: `src/pluginMarketplace/data/DataLoader.ts`
 
 **Step 1: 在 DataLoader 中添加详情解析方法**
 
@@ -697,7 +697,7 @@ Expected: Success
 **Step 4: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/data/PluginDataStore.ts vscode-extension/src/pluginMarketplace/data/DataLoader.ts
+git add src/pluginMarketplace/data/PluginDataStore.ts src/pluginMarketplace/data/DataLoader.ts
 git commit -m "feat: add plugin detail loading with cache and request deduplication"
 ```
 
@@ -706,11 +706,11 @@ git commit -m "feat: add plugin detail loading with cache and request deduplicat
 ## Task 5: 在 extension.ts 中初始化 PluginDataStore
 
 **Files:**
-- Modify: `vscode-extension/src/extension.ts`
+- Modify: `src/extension.ts`
 
 **Step 1: 读取现有 extension.ts**
 
-Run: `Read vscode-extension/src/extension.ts`
+Run: `Read src/extension.ts`
 
 **Step 2: 修改 extension.ts 以使用新的 PluginDataStore**
 
@@ -748,7 +748,7 @@ Expected: Success
 **Step 4: 提交**
 
 ```bash
-git add vscode-extension/src/extension.ts
+git add src/extension.ts
 git commit -m "feat: initialize PluginDataStore in extension activation"
 ```
 
@@ -757,11 +757,11 @@ git commit -m "feat: initialize PluginDataStore in extension activation"
 ## Task 6: 更新 PluginTreeProvider 使用 Store 事件
 
 **Files:**
-- Modify: `vscode-extension/src/pluginMarketplace/pluginTreeProvider.ts`
+- Modify: `src/pluginMarketplace/pluginTreeProvider.ts`
 
 **Step 1: 读取现有的 PluginTreeProvider**
 
-Run: `Read vscode-extension/src/pluginMarketplace/pluginTreeProvider.ts`
+Run: `Read src/pluginMarketplace/pluginTreeProvider.ts`
 
 **Step 2: 修改 PluginTreeProvider 订阅 Store 事件**
 
@@ -806,7 +806,7 @@ Expected: Success
 **Step 4: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/pluginTreeProvider.ts
+git add src/pluginMarketplace/pluginTreeProvider.ts
 git commit -m "feat: make PluginTreeProvider listen to Store events"
 ```
 
@@ -815,11 +815,11 @@ git commit -m "feat: make PluginTreeProvider listen to Store events"
 ## Task 7: 更新 MessageHandlers 使用 PluginDataStore
 
 **Files:**
-- Modify: `vscode-extension/src/pluginMarketplace/webview/messages/handlers.ts`
+- Modify: `src/pluginMarketplace/webview/messages/handlers.ts`
 
 **Step 1: 读取现有的 handlers.ts**
 
-Run: `Read vscode-extension/src/pluginMarketplace/webview/messages/handlers.ts`
+Run: `Read src/pluginMarketplace/webview/messages/handlers.ts`
 
 **Step 2: 修改 handlers 使用 PluginDataStore**
 
@@ -868,7 +868,7 @@ Expected: Success
 **Step 4: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/messages/handlers.ts
+git add src/pluginMarketplace/webview/messages/handlers.ts
 git commit -m "feat: update MessageHandlers to use PluginDataStore"
 ```
 
@@ -877,11 +877,11 @@ git commit -m "feat: update MessageHandlers to use PluginDataStore"
 ## Task 8: 更新 PluginDetailsPanel 使用 Store 和监听事件
 
 **Files:**
-- Modify: `vscode-extension/src/pluginMarketplace/webview/PluginDetailsPanel.ts`
+- Modify: `src/pluginMarketplace/webview/PluginDetailsPanel.ts`
 
 **Step 1: 读取现有的 PluginDetailsPanel.ts**
 
-Run: `Read vscode-extension/src/pluginMarketplace/webview/PluginDetailsPanel.ts`
+Run: `Read src/pluginMarketplace/webview/PluginDetailsPanel.ts`
 
 **Step 2: 修改 PluginDetailsPanel 订阅详情更新事件**
 
@@ -938,7 +938,7 @@ Expected: Success
 **Step 4: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/PluginDetailsPanel.ts
+git add src/pluginMarketplace/webview/PluginDetailsPanel.ts
 git commit -m "feat: make PluginDetailsPanel listen to Store events"
 ```
 
@@ -947,7 +947,7 @@ git commit -m "feat: make PluginDetailsPanel listen to Store events"
 ## Task 9: 迁移详情解析逻辑到 DataLoader
 
 **Files:**
-- Modify: `vscode-extension/src/pluginMarketplace/data/DataLoader.ts`
+- Modify: `src/pluginMarketplace/data/DataLoader.ts`
 
 **Step 1: 迁移解析方法**
 
@@ -1022,7 +1022,7 @@ Expected: Success
 **Step 4: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/data/DataLoader.ts
+git add src/pluginMarketplace/data/DataLoader.ts
 git commit -m "feat: migrate detail parsing logic to DataLoader"
 ```
 
@@ -1031,12 +1031,12 @@ git commit -m "feat: migrate detail parsing logic to DataLoader"
 ## Task 10: 删除或重构旧的 CacheManager
 
 **Files:**
-- Modify: `vscode-extension/src/pluginMarketplace/webview/services/CacheManager.ts`
+- Modify: `src/pluginMarketplace/webview/services/CacheManager.ts`
 - 或删除（如果不再需要）
 
 **Step 1: 评估 CacheManager 的使用**
 
-Run: `Grep "CacheManager" vscode-extension/src --glob="*.ts" --output-mode="files_with_matches"`
+Run: `Grep "CacheManager" src --glob="*.ts" --output-mode="files_with_matches"`
 
 **Step 2: 更新所有 CacheManager 引用**
 
@@ -1054,7 +1054,7 @@ Expected: Success
 **Step 5: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/services/CacheManager.ts
+git add src/pluginMarketplace/webview/services/CacheManager.ts
 git commit -m "refactor: simplify or remove CacheManager after Store migration"
 ```
 
@@ -1063,16 +1063,16 @@ git commit -m "refactor: simplify or remove CacheManager after Store migration"
 ## Task 11: 删除旧的 PluginDetailsService
 
 **Files:**
-- Delete: `vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts`
+- Delete: `src/pluginMarketplace/webview/services/PluginDetailsService.ts`
 
 **Step 1: 确认没有引用**
 
-Run: `Grep "PluginDetailsService" vscode-extension/src --glob="*.ts" --output-mode="files_with_matches"`
+Run: `Grep "PluginDetailsService" src --glob="*.ts" --output-mode="files_with_matches"`
 
 **Step 2: 删除文件**
 
 ```bash
-rm vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts
+rm src/pluginMarketplace/webview/services/PluginDetailsService.ts
 ```
 
 **Step 3: 编译验证**
@@ -1083,7 +1083,7 @@ Expected: Success
 **Step 4: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts
+git add src/pluginMarketplace/webview/services/PluginDetailsService.ts
 git commit -m "refactor: remove old PluginDetailsService after migration"
 ```
 
@@ -1092,7 +1092,7 @@ git commit -m "refactor: remove old PluginDetailsService after migration"
 ## Task 12: 更新 webview 消息类型定义
 
 **Files:**
-- Modify: `vscode-extension/src/pluginMarketplace/webview/messages/types.ts`
+- Modify: `src/pluginMarketplace/webview/messages/types.ts`
 
 **Step 1: 添加新消息类型**
 
@@ -1120,7 +1120,7 @@ Expected: Success
 **Step 3: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/messages/types.ts
+git add src/pluginMarketplace/webview/messages/types.ts
 git commit -m "feat: add new message types for Store events"
 ```
 
@@ -1129,11 +1129,11 @@ git commit -m "feat: add new message types for Store events"
 ## Task 13: 更新 webview 前端处理新消息
 
 **Files:**
-- Modify: `vscode-extension/webview/src/`
+- Modify: `webview/src/`
 
 **Step 1: 找到处理消息的组件**
 
-Run: `Grep "type:.*installSuccess\\|type:.*detailUpdate" vscode-extension/webview/src --glob="*.tsx" --output-mode="files_with_matches"`
+Run: `Grep "type:.*installSuccess\\|type:.*detailUpdate" webview/src --glob="*.tsx" --output-mode="files_with_matches"`
 
 **Step 2: 更新消息处理**
 
@@ -1147,7 +1147,7 @@ Expected: Success
 **Step 4: 提交**
 
 ```bash
-git add vscode-extension/webview/src/
+git add webview/src/
 git commit -m "feat: handle Store event messages in webview"
 ```
 

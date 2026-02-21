@@ -6,7 +6,7 @@
 
 ### 步骤 1: 添加文件路径常量和类型定义
 
-**文件**: `vscode-extension/src/pluginMarketplace/types.ts`
+**文件**: `src/pluginMarketplace/types.ts`
 
 添加 Claude 配置文件路径常量和新的类型定义：
 
@@ -99,7 +99,7 @@ export interface MarketplaceInfo {
 
 ### 步骤 2: 创建 FileParser 类
 
-**文件**: `vscode-extension/src/pluginMarketplace/webview/services/FileParser.ts`
+**文件**: `src/pluginMarketplace/webview/services/FileParser.ts`
 
 新建文件解析类，负责从本地文件读取数据：
 
@@ -229,7 +229,7 @@ export class FileParser {
 
 ### 步骤 3: 创建 CacheManager 类
 
-**文件**: `vscode-extension/src/pluginMarketplace/webview/services/CacheManager.ts`
+**文件**: `src/pluginMarketplace/webview/services/CacheManager.ts`
 
 新建缓存管理类：
 
@@ -373,7 +373,7 @@ export class CacheManager {
 
 ### 步骤 4: 重构 PluginDataService
 
-**文件**: `vscode-extension/src/pluginMarketplace/webview/services/PluginDataService.ts`
+**文件**: `src/pluginMarketplace/webview/services/PluginDataService.ts`
 
 重构数据服务类，使用 CacheManager：
 
@@ -678,7 +678,7 @@ export class PluginDataService {
 
 ### 步骤 5: 更新 Webview 消息处理器
 
-**文件**: `vscode-extension/src/pluginMarketplace/webview/messages/handlers.ts`
+**文件**: `src/pluginMarketplace/webview/messages/handlers.ts`
 
 添加启用/禁用插件的处理器：
 
@@ -749,11 +749,11 @@ case 'refreshCache':
 ## 文件清单
 
 ### 新建文件
-- `vscode-extension/src/pluginMarketplace/webview/services/FileParser.ts`
-- `vscode-extension/src/pluginMarketplace/webview/services/CacheManager.ts`
+- `src/pluginMarketplace/webview/services/FileParser.ts`
+- `src/pluginMarketplace/webview/services/CacheManager.ts`
 
 ### 修改文件
-- `vscode-extension/src/pluginMarketplace/types.ts` - 添加常量和类型
-- `vscode-extension/src/pluginMarketplace/webview/services/PluginDataService.ts` - 重构
-- `vscode-extension/src/pluginMarketplace/webview/messages/handlers.ts` - 添加消息处理
+- `src/pluginMarketplace/types.ts` - 添加常量和类型
+- `src/pluginMarketplace/webview/services/PluginDataService.ts` - 重构
+- `src/pluginMarketplace/webview/messages/handlers.ts` - 添加消息处理
 - `webview-app/src/` - UI 更新

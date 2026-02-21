@@ -17,7 +17,7 @@
 ## Task 1: 添加插件详情数据类型定义
 
 **Files:**
-- Modify: `vscode-extension/src/pluginMarketplace/webview/messages/types.ts`
+- Modify: `src/pluginMarketplace/webview/messages/types.ts`
 
 **Step 1: 添加插件详情相关类型**
 
@@ -126,7 +126,7 @@ Expected: 编译成功，无类型错误
 **Step 3: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/messages/types.ts
+git add src/pluginMarketplace/webview/messages/types.ts
 git commit -m "feat: add plugin detail data types"
 ```
 
@@ -135,12 +135,12 @@ git commit -m "feat: add plugin detail data types"
 ## Task 2: 创建插件详情数据服务
 
 **Files:**
-- Create: `vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts`
+- Create: `src/pluginMarketplace/webview/services/PluginDetailsService.ts`
 
 **Step 1: 创建 PluginDetailsService 类**
 
 ```typescript
-// vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts
+// src/pluginMarketplace/webview/services/PluginDetailsService.ts
 
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -474,7 +474,7 @@ Expected: 编译成功
 **Step 3: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts
+git add src/pluginMarketplace/webview/services/PluginDetailsService.ts
 git commit -m "feat: add PluginDetailsService for fetching plugin details"
 ```
 
@@ -483,12 +483,12 @@ git commit -m "feat: add PluginDetailsService for fetching plugin details"
 ## Task 3: 创建 PluginDetailsPanel 类
 
 **Files:**
-- Create: `vscode-extension/src/pluginMarketplace/webview/PluginDetailsPanel.ts`
+- Create: `src/pluginMarketplace/webview/PluginDetailsPanel.ts`
 
 **Step 1: 创建 PluginDetailsPanel 类**
 
 ```typescript
-// vscode-extension/src/pluginMarketplace/webview/PluginDetailsPanel.ts
+// src/pluginMarketplace/webview/PluginDetailsPanel.ts
 
 import * as vscode from 'vscode';
 import { PluginDetailsService } from './services/PluginDetailsService';
@@ -711,7 +711,7 @@ Expected: 编译成功
 **Step 3: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/PluginDetailsPanel.ts
+git add src/pluginMarketplace/webview/PluginDetailsPanel.ts
 git commit -m "feat: add PluginDetailsPanel for showing plugin details"
 ```
 
@@ -720,7 +720,7 @@ git commit -m "feat: add PluginDetailsPanel for showing plugin details"
 ## Task 4: 更新消息处理器支持 openDetails
 
 **Files:**
-- Modify: `vscode-extension/src/pluginMarketplace/webview/messages/handlers.ts`
+- Modify: `src/pluginMarketplace/webview/messages/handlers.ts`
 
 **Step 1: 修改 handleOpenDetails 方法**
 
@@ -769,7 +769,7 @@ Expected: 编译成功
 **Step 3: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/messages/handlers.ts
+git add src/pluginMarketplace/webview/messages/handlers.ts
 git commit -m "feat: update handleOpenDetails to open details panel"
 ```
 
@@ -778,7 +778,7 @@ git commit -m "feat: update handleOpenDetails to open details panel"
 ## Task 5: 更新 PluginDataService 添加 getContext 方法
 
 **Files:**
-- Modify: `vscode-extension/src/pluginMarketplace/webview/services/PluginDataService.ts`
+- Modify: `src/pluginMarketplace/webview/services/PluginDataService.ts`
 
 **Step 1: 确认 getContext 方法存在**
 
@@ -801,7 +801,7 @@ Expected: 编译成功
 **Step 3: 如果添加了方法，提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/services/PluginDataService.ts
+git add src/pluginMarketplace/webview/services/PluginDataService.ts
 git commit -m "feat: add getContext method to PluginDataService"
 ```
 
@@ -825,7 +825,7 @@ import React, { useState, useEffect } from 'react';
 import { Spin, Alert, Button } from 'antd';
 import { ReloadOutlined, LoadingOutlined } from '@ant-design/icons';
 import vscode from '../main';
-import { PluginDetailData } from '../../vscode-extension/src/pluginMarketplace/webview/messages/types';
+import { PluginDetailData } from '../../src/pluginMarketplace/webview/messages/types';
 import DetailHeader from './DetailHeader';
 import DetailContent from './DetailContent';
 
@@ -987,7 +987,7 @@ import {
   StarFilled
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
-import { PluginDetailData } from '../../../vscode-extension/src/pluginMarketplace/webview/messages/types';
+import { PluginDetailData } from '../../../src/pluginMarketplace/webview/messages/types';
 
 const { Text, Title } = Typography;
 
@@ -1165,7 +1165,7 @@ export default DetailHeader;
 import React from 'react';
 import { Typography, Empty } from 'antd';
 import { FileTextOutlined } from '@ant-design/icons';
-import { PluginDetailData } from '../../../vscode-extension/src/pluginMarketplace/webview/messages/types';
+import { PluginDetailData } from '../../../src/pluginMarketplace/webview/messages/types';
 import ComponentsSection from './ComponentsSection';
 import ReadmeSection from './ReadmeSection';
 
@@ -1238,7 +1238,7 @@ import {
   ApiOutlined,
   CodeOutlined
 } from '@ant-design/icons';
-import { PluginDetailData } from '../../../vscode-extension/src/pluginMarketplace/webview/messages/types';
+import { PluginDetailData } from '../../../src/pluginMarketplace/webview/messages/types';
 
 const { Title } = Typography;
 
@@ -1717,7 +1717,7 @@ git commit -m "feat: add styles for details panel"
 **Step 1: 构建完整项目**
 
 Run: `cd vscode-extension && npm run build-webview`
-Expected: webview 构建成功，生成 `vscode-extension/webview/dist/` 文件
+Expected: webview 构建成功，生成 `webview/dist/` 文件
 
 **Step 2: 编译 extension**
 
@@ -1738,7 +1738,7 @@ Expected: TypeScript 编译成功，无错误
 **Step 4: 提交构建产物**
 
 ```bash
-git add vscode-extension/webview/dist/
+git add webview/dist/
 git commit -m "build: update webview dist with details panel support"
 ```
 
@@ -1760,7 +1760,7 @@ git commit -m "build: update webview dist with details panel support"
 
 ```typescript
 // 移除这行
-import { PluginDetailData } from '../../../vscode-extension/src/pluginMarketplace/webview/messages/types';
+import { PluginDetailData } from '../../../src/pluginMarketplace/webview/messages/types';
 
 // 添加本地类型定义
 export interface PluginDetailData {

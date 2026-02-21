@@ -96,7 +96,7 @@ async installPlugin(name: string, marketplace: string) {
 ## 目录结构
 
 ```
-vscode-extension/src/pluginMarketplace/
+src/pluginMarketplace/
 ├── data/
 │   ├── PluginDataStore.ts          # 核心 Store
 │   ├── DataLoader.ts                # 数据加载器

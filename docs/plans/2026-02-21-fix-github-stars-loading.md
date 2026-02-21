@@ -24,16 +24,16 @@
 - 同步 await 阻塞整个插件详情加载
 
 **影响范围:**
-- 文件: `vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts`
-- 文件: `vscode-extension/webview/src/details/DetailHeader.tsx`
-- 类型: `vscode-extension/src/pluginMarketplace/webview/messages/types.ts`
+- 文件: `src/pluginMarketplace/webview/services/PluginDetailsService.ts`
+- 文件: `webview/src/details/DetailHeader.tsx`
+- 类型: `src/pluginMarketplace/webview/messages/types.ts`
 
 ---
 
 ## Task 1: 添加星标缓存结构和类型定义
 
 **文件:**
-- 修改: `vscode-extension/src/pluginMarketplace/webview/messages/types.ts:276-280`
+- 修改: `src/pluginMarketplace/webview/messages/types.ts:276-280`
 
 **目标:** 修改 `RepositoryInfo` 类型,使 `stars` 可以表示三种状态
 
@@ -55,7 +55,7 @@ export interface RepositoryInfo {
 **步骤 2: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/messages/types.ts
+git add src/pluginMarketplace/webview/messages/types.ts
 git commit -m "refactor: update RepositoryInfo.stars type to support loading state"
 ```
 
@@ -64,7 +64,7 @@ git commit -m "refactor: update RepositoryInfo.stars type to support loading sta
 ## Task 2: 添加星标缓存层到 PluginDetailsService
 
 **文件:**
-- 修改: `vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts:32-40`
+- 修改: `src/pluginMarketplace/webview/services/PluginDetailsService.ts:32-40`
 
 **目标:** 添加星标缓存实例变量
 
@@ -93,7 +93,7 @@ export class PluginDetailsService {
 **步骤 2: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts
+git add src/pluginMarketplace/webview/services/PluginDetailsService.ts
 git commit -m "feat: add stars cache to PluginDetailsService"
 ```
 
@@ -102,7 +102,7 @@ git commit -m "feat: add stars cache to PluginDetailsService"
 ## Task 3: 重构 fetchGitHubStars 方法
 
 **文件:**
-- 修改: `vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts:559-570`
+- 修改: `src/pluginMarketplace/webview/services/PluginDetailsService.ts:559-570`
 
 **目标:** 添加缓存、超时、返回 null 表示失败
 
@@ -160,7 +160,7 @@ private async fetchGitHubStars(owner: string, repo: string): Promise<number | nu
 **步骤 2: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts
+git add src/pluginMarketplace/webview/services/PluginDetailsService.ts
 git commit -m "refactor: add cache and timeout to fetchGitHubStars"
 ```
 
@@ -169,7 +169,7 @@ git commit -m "refactor: add cache and timeout to fetchGitHubStars"
 ## Task 4: 移除星标获取对 README 的依赖
 
 **文件:**
-- 修改: `vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts:338-351`
+- 修改: `src/pluginMarketplace/webview/services/PluginDetailsService.ts:338-351`
 
 **目标:** 只要有 GitHub 仓库就异步获取星标,不等待结果
 
@@ -231,7 +231,7 @@ if (market.source.source === 'github' && market.source.repo) {
 **步骤 2: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts
+git add src/pluginMarketplace/webview/services/PluginDetailsService.ts
 git commit -m "refactor: make stars fetching async and independent from README"
 ```
 
@@ -240,7 +240,7 @@ git commit -m "refactor: make stars fetching async and independent from README"
 ## Task 5: 更新前端显示逻辑
 
 **文件:**
-- 修改: `vscode-extension/webview/src/details/DetailHeader.tsx:92-96`
+- 修改: `webview/src/details/DetailHeader.tsx:92-96`
 
 **目标:** 区分 undefined(未获取) 和 null(获取失败) 的显示
 
@@ -288,8 +288,8 @@ npm run build-webview
 **步骤 3: 提交**
 
 ```bash
-git add vscode-extension/webview/src/details/DetailHeader.tsx
-git add vscode-extension/webview/dist
+git add webview/src/details/DetailHeader.tsx
+git add webview/dist
 git commit -m "feat: distinguish loading state for GitHub stars in UI"
 ```
 
@@ -298,7 +298,7 @@ git commit -m "feat: distinguish loading state for GitHub stars in UI"
 ## Task 6: 清理缓存方法(可选)
 
 **文件:**
-- 修改: `vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts:76-90`
+- 修改: `src/pluginMarketplace/webview/services/PluginDetailsService.ts:76-90`
 
 **目标:** 在 `clearCache` 方法中同时清理星标缓存
 
@@ -338,7 +338,7 @@ clearStarsCache(owner?: string, repo?: string): void {
 **步骤 2: 提交**
 
 ```bash
-git add vscode-extension/src/pluginMarketplace/webview/services/PluginDetailsService.ts
+git add src/pluginMarketplace/webview/services/PluginDetailsService.ts
 git commit -m "feat: add clearStarsCache method"
 ```
 

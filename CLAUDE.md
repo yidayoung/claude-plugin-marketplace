@@ -7,16 +7,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a VS Code extension for managing Claude Code plugin marketplace. It has two parts:
 
 - `vscode-extension/` - VS Code extension (TypeScript)
-- `vscode-extension/webview/` - React webview UI (Vite + React + Ant Design)
+- `webview/` - React webview UI (Vite + React + Ant Design)
 
 ## Build Commands
 
 ### Extension
-- `npm run compile` - Compile TypeScript to `vscode-extension/out/`
+- `npm run compile` - Compile TypeScript to `out/`
 - `npm run watch` - Watch mode for development
 
 ### Webview
-- `npm run build-webview` - Build React app to `vscode-extension/webview/dist/`
+- `npm run build-webview` - Build React app to `webview/dist/`
 
 ### Full Build
 - Use VS Code task "vscode: 全部构建" or run: `npm run compile && npm run build-webview`
@@ -32,17 +32,17 @@ This is a VS Code extension for managing Claude Code plugin marketplace. It has 
 ## Architecture
 
 ### Core Managers
-- `PluginManager` ([pluginManager.ts](vscode-extension/src/pluginMarketplace/pluginManager.ts)) - Manages plugin install/uninstall/update via Claude CLI
-- `MarketplaceManager` ([marketplaceManager.ts](vscode-extension/src/pluginMarketplace/marketplaceManager.ts)) - Manages marketplace sources
-- `PluginTreeProvider` ([pluginTreeProvider.ts](vscode-extension/src/pluginMarketplace/pluginTreeProvider.ts)) - TreeView data provider
+- `PluginManager` ([pluginManager.ts](src/pluginMarketplace/pluginManager.ts)) - Manages plugin install/uninstall/update via Claude CLI
+- `MarketplaceManager` ([marketplaceManager.ts](src/pluginMarketplace/marketplaceManager.ts)) - Manages marketplace sources
+- `PluginTreeProvider` ([pluginTreeProvider.ts](src/pluginMarketplace/pluginTreeProvider.ts)) - TreeView data provider
 
 ### Webview Communication
-- `PluginMarketplacePanel` ([PluginMarketplacePanel.ts](vscode-extension/src/pluginMarketplace/webview/PluginMarketplacePanel.ts)) - Creates webview panels
-- `MessageHandler` ([handlers.ts](vscode-extension/src/pluginMarketplace/webview/messages/handlers.ts)) - Handles bidirectional messages
-- `PluginDataService` ([PluginDataService.ts](vscode-extension/src/pluginMarketplace/webview/services/PluginDataService.ts)) - Data layer
+- `PluginMarketplacePanel` ([PluginMarketplacePanel.ts](src/pluginMarketplace/webview/PluginMarketplacePanel.ts)) - Creates webview panels
+- `MessageHandler` ([handlers.ts](src/pluginMarketplace/webview/messages/handlers.ts)) - Handles bidirectional messages
+- `PluginDataService` ([PluginDataService.ts](src/pluginMarketplace/webview/services/PluginDataService.ts)) - Data layer
 
 ### CLI Integration
-All plugin operations use `execClaudeCommand()` from [types.ts](vscode-extension/src/pluginMarketplace/types.ts):
+All plugin operations use `execClaudeCommand()` from [types.ts](src/pluginMarketplace/types.ts):
 - `claude plugin list --json`
 - `claude plugin install "<name>@<marketplace>"`
 - `claude plugin uninstall "<name>"`
@@ -52,8 +52,8 @@ All plugin operations use `execClaudeCommand()` from [types.ts](vscode-extension
 ## Key Conventions
 
 1. **Always rebuild webview after editing** `webview/src/` files
-2. **Extension entry point**: [extension.ts](vscode-extension/src/extension.ts)
-3. **Tree item types** are defined in [types.ts](vscode-extension/src/pluginMarketplace/types.ts) as `TreeItemType`
+2. **Extension entry point**: [extension.ts](src/extension.ts)
+3. **Tree item types** are defined in [types.ts](src/pluginMarketplace/types.ts) as `TreeItemType`
 4. **CLI commands** are wrapped in `execClaudeCommand()` with timeout handling
 
 ## Webview UI Conventions
@@ -115,7 +115,7 @@ import './MyComponent.css'
 #### 当前 CSS 文件结构
 
 ```
-vscode-extension/webview/src/
+webview/src/
 ├── index.css      # 全局基础样式（滚动条、选择文本、可访问性）
 └── theme/
     └── antd-theme.ts  # Ant Design 主题配置（VS Code 变量映射）

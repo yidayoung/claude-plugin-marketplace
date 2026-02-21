@@ -172,7 +172,7 @@ interface PluginStatus {
 ## 文件结构
 
 ```
-vscode-extension/src/pluginMarketplace/
+src/pluginMarketplace/
 ├── webview/
 │   └── services/
 │       ├── PluginDataService.ts      (重构)

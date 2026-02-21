@@ -4,7 +4,6 @@
     {
       "type": "npm",
       "script": "watch",
-      "path": "vscode-extension",
       "problemMatcher": "$tsc-watch",
       "isBackground": true,
       "presentation": {
@@ -33,7 +32,6 @@
     {
       "type": "npm",
       "script": "compile",
-      "path": "vscode-extension",
       "problemMatcher": "$tsc",
       "presentation": {
         "reveal": "silent"
@@ -44,7 +42,6 @@
     {
       "type": "npm",
       "script": "build-webview",
-      "path": "vscode-extension",
       "problemMatcher": [],
       "presentation": {
         "reveal": "silent"
@@ -65,7 +62,6 @@
     {
       "type": "npm",
       "script": "dev-webview",
-      "path": "vscode-extension",
       "problemMatcher": [],
       "isBackground": true,
       "presentation": {
