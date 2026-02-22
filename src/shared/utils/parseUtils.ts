@@ -2,6 +2,14 @@
 import * as path from 'path';
 
 /**
+ * 仓库信息
+ */
+export interface RepositoryInfo {
+  type: 'github' | 'other';
+  url: string;
+}
+
+/**
  * 解析 Markdown frontmatter
  */
 export function parseFrontmatter(content: string): Record<string, any> | null {
@@ -33,6 +41,30 @@ export function parseGitHubRepo(url: string): { owner: string; repo: string } | 
   }
 
   return null;
+}
+
+/**
+ * 解析仓库信息
+ */
+export function parseRepository(packageJson: any): RepositoryInfo | undefined {
+  const repo = packageJson.repository;
+  if (!repo) return undefined;
+
+  if (typeof repo === 'string') {
+    if (repo.includes('github.com')) {
+      return { type: 'github', url: repo };
+    }
+    return { type: 'other', url: repo };
+  }
+
+  if (repo.type === 'github') {
+    return {
+      type: 'github',
+      url: `https://github.com/${repo.owner}/${repo.name}`
+    };
+  }
+
+  return { type: 'other', url: repo.url || '' };
 }
 
 /**

@@ -16,7 +16,10 @@ import {
   RepositoryInfo
 } from '../messages/types';
 import { PluginInfo } from '../../types';
-import { parseFrontmatter, parseGitHubRepo, getCustomPaths } from '@shared/utils/parseUtils';
+import { PluginPathResolver } from './PluginPathResolver';
+import { ContentParser } from './ContentParser';
+import { tryReadFile } from '@shared/utils/fileUtils';
+import { parseFrontmatter, parseGitHubRepo, getCustomPaths, parseRepository as parseRepositoryUtil } from '@shared/utils/parseUtils';
 
 /**
  * 插件详情缓存条目
@@ -37,8 +40,13 @@ export class PluginDetailsService {
   private readonly CACHE_TTL = 5 * 60 * 1000;
   // 本地市场路径缓存，避免重复查找
   private localPathCache = new Map<string, string>();
+  private pathResolver: PluginPathResolver;
+  private contentParser: ContentParser;
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(private context: vscode.ExtensionContext) {
+    this.pathResolver = new PluginPathResolver(context);
+    this.contentParser = new ContentParser();
+  }
 
   /**
    * 获取插件详情
@@ -112,86 +120,6 @@ export class PluginDetailsService {
   }
 
   /**
-   * 获取插件的本地市场源路径
-   * 通过读取 marketplace.json 获取插件的 source 配置
-   * - 相对路径：直接从市场目录读取
-   * - 远程 Git：未安装时无法读取，返回 null
-   */
-  private async getLocalMarketPath(
-    pluginName: string,
-    marketplace: string
-  ): Promise<string | null> {
-    const cacheKey = `${pluginName}@${marketplace}`;
-
-    // 检查缓存
-    const cachedPath = this.localPathCache.get(cacheKey);
-    if (cachedPath) {
-      try {
-        await fs.access(cachedPath);
-        return cachedPath;
-      } catch {
-        // 缓存的路径不存在，清除缓存
-        this.localPathCache.delete(cacheKey);
-      }
-    }
-
-    const homeDir = process.env.HOME || process.env.USERPROFILE;
-    if (!homeDir) {
-      console.error('[PluginDetailsService] Cannot determine HOME directory');
-      return null;
-    }
-
-    const marketplacePath = path.join(homeDir, '.claude', 'plugins', 'marketplaces', marketplace);
-    const marketplaceJsonPath = path.join(marketplacePath, '.claude-plugin', 'marketplace.json');
-
-    console.log(`[PluginDetailsService] Looking for marketplace.json at: ${marketplaceJsonPath}`);
-
-    try {
-      // 读取 marketplace.json
-      const marketplaceContent = await fs.readFile(marketplaceJsonPath, 'utf-8');
-      const marketplaceConfig = JSON.parse(marketplaceContent);
-
-      // 查找目标插件
-      const pluginConfig = marketplaceConfig.plugins?.find((p: any) => p.name === pluginName);
-      if (!pluginConfig) {
-        console.log(`[PluginDetailsService] Plugin ${pluginName} not found in marketplace.json`);
-        return null;
-      }
-
-      const source = pluginConfig.source;
-      console.log(`[PluginDetailsService] Plugin ${pluginName} source:`, source);
-
-      // 处理相对路径 source
-      if (typeof source === 'string' && source.startsWith('./')) {
-        const relativePath = source.slice(2); // 去掉 ./
-        const fullPath = path.join(marketplacePath, relativePath);
-
-        try {
-          await fs.access(fullPath);
-          console.log(`[PluginDetailsService] Found local path: ${fullPath}`);
-          this.localPathCache.set(cacheKey, fullPath);
-          return fullPath;
-        } catch {
-          console.log(`[PluginDetailsService] Local path not accessible: ${fullPath}`);
-          return null;
-        }
-      }
-
-      // 远程 Git 仓库
-      if (typeof source === 'object') {
-        console.log(`[PluginDetailsService] Plugin ${pluginName} has remote source, skipping local read`);
-        return null;
-      }
-
-      console.log(`[PluginDetailsService] Unknown source type for ${pluginName}:`, source);
-      return null;
-    } catch (error) {
-      console.error(`[PluginDetailsService] Error reading marketplace.json:`, error);
-      return null;
-    }
-  }
-
-  /**
    * 获取已安装插件的详情（从本地文件读取）
    * 如果本地找不到，会回退到远程获取
    * @param enabledFromStore 从 PluginDataStore 传递的启用状态（单一数据源）
@@ -203,49 +131,40 @@ export class PluginDetailsService {
     enabledFromStore?: boolean,
     scopeFromStore?: 'user' | 'project' | 'local'
   ): Promise<PluginDetailData> {
-    // 获取插件目录（传递 marketplace 以精确匹配）
-    const pluginPath = await this.getPluginPath(pluginName, marketplace);
+    // 使用路径解析器查找插件
+    const pluginPath = await this.pathResolver.findPluginPath(pluginName, marketplace);
     if (!pluginPath) {
-      // 本地找不到，回退到远程获取
       console.log(`[PluginDetailsService] Plugin ${pluginName}@${marketplace} not found locally, fetching from remote`);
-      return this.getRemotePluginDetail(pluginName, marketplace);
+      return this.getRemotePluginDetail(pluginName, marketplace, enabledFromStore, scopeFromStore);
     }
 
-    // 查找并读取配置文件（package.json 或 plugin.json）
-    // 如果没有配置文件，使用空对象
+    // 读取配置文件和 README
     const configJson = await this.readPluginConfig(pluginPath);
-
-    // 读取 README
     const readme = await this.readReadme(pluginPath);
 
-    // 解析插件内容（并行执行以提高性能）
-    // 传入 configJson 以获取自定义路径配置
+    // 使用内容解析器解析插件内容
     const [skills, agents, commands, hooks, mcps, lsps, outputStyles] = await Promise.all([
-      this.parseSkills(pluginPath, configJson),
-      this.parseAgents(pluginPath, configJson),
-      this.parseCommands(pluginPath, configJson),
-      this.parseHooks(pluginPath, configJson),
-      this.parseMcps(pluginPath, configJson),
-      this.parseLsps(pluginPath, configJson),
-      this.parseOutputStyles(pluginPath, configJson),
+      this.contentParser.parseSkills(pluginPath, configJson),
+      this.contentParser.parseAgents(pluginPath, configJson),
+      this.contentParser.parseCommands(pluginPath, configJson),
+      this.contentParser.parseHooks(pluginPath, configJson),
+      this.contentParser.parseMcps(pluginPath, configJson),
+      this.contentParser.parseLsps(pluginPath, configJson),
+      this.contentParser.parseOutputStyles(pluginPath, configJson),
     ]);
 
-    const repository = configJson ? this.parseRepository(configJson) : undefined;
-    const dependencies = configJson ? this.parseDependencies(configJson) : [];
-
-    // 如果没有 README 且没有其他内容，尝试从远程获取
+    // 如果没有内容，尝试从远程获取
     if (!readme && skills.length === 0 && agents.length === 0 && commands.length === 0) {
       console.log(`[PluginDetailsService] Plugin ${pluginName} has no local content, fetching from remote`);
       return this.getRemotePluginDetail(pluginName, marketplace);
     }
 
-    // 获取启用状态和作用域（如果从 Store 传递了，直接使用；否则从文件解析）
+    // 获取安装状态和作用域
     let enabled = enabledFromStore;
     let scope = scopeFromStore;
     let actualMarketplace = marketplace;
 
     if (enabledFromStore === undefined || scopeFromStore === undefined) {
-      // 只有在 Store 没有传递状态时才从文件解析（保持兼容性）
       const { FileParser } = await import('./FileParser');
       const parser = new FileParser();
       const [installedPlugins, enabledMap] = await Promise.all([
@@ -253,15 +172,18 @@ export class PluginDetailsService {
         parser.parseEnabledPlugins()
       ]);
 
-      // 查找当前插件的安装信息 - 需要同时匹配插件名和市场名
       const installedInfo = installedPlugins.find(p => p.name === pluginName && p.marketplace === marketplace);
       const key = `${pluginName}@${marketplace}`;
       const isEnabled = enabledMap.get(key);
 
-      enabled = enabledFromStore ?? isEnabled ?? true; // 优先使用 Store 传递的值
+      enabled = enabledFromStore ?? isEnabled ?? true;
       scope = scopeFromStore ?? installedInfo?.scope;
       actualMarketplace = installedInfo?.marketplace || marketplace;
     }
+
+    const repository = configJson ? parseRepositoryUtil(configJson) : undefined;
+    const dependencies = configJson ? this.parseDependencies(configJson) : [];
+
 
     return {
       name: configJson?.name || pluginName,
@@ -302,15 +224,15 @@ export class PluginDetailsService {
     ];
 
     for (const configPath of configPaths) {
-      try {
-        const content = await fs.readFile(configPath, 'utf-8');
-        return JSON.parse(content);
-      } catch {
-        // 继续尝试下一个
+      const content = await tryReadFile(configPath);
+      if (content) {
+        try {
+          return JSON.parse(content);
+        } catch {
+          continue;
+        }
       }
     }
-
-    // 没有找到配置文件，返回 undefined 而不是抛出错误
     return undefined;
   }
 
@@ -376,23 +298,23 @@ export class PluginDetailsService {
 
     let configJson: any = undefined;
 
-    // 使用缓存优化的路径查找方法
+    // 使用路径解析器获取本地市场路径
     const t2 = Date.now();
-    const localMarketPath = await this.getLocalMarketPath(pluginName, marketplace);
+    const localMarketPath = await this.pathResolver.getLocalMarketPath(pluginName, marketplace);
     console.log(`[PluginDetailsService] Path lookup took ${Date.now() - t2}ms, found: ${localMarketPath ? 'YES' : 'NO'}`);
 
     if (localMarketPath) {
       try {
         const t3 = Date.now();
 
-        // 首先读取配置文件（用于获取自定义路径）
+        // 读取配置文件
         try {
           const configPath = path.join(localMarketPath, '.claude-plugin', 'plugin.json');
           const configContent = await fs.readFile(configPath, 'utf-8');
           configJson = JSON.parse(configContent);
           license = configJson?.license;
           if (configJson?.repository) {
-            repository = this.parseRepository(configJson);
+            repository = parseRepositoryUtil(configJson);
           }
         } catch {
           // 配置文件不存在，继续
@@ -407,22 +329,21 @@ export class PluginDetailsService {
         const t5 = Date.now();
         console.log(`[PluginDetailsService] README read took ${t5 - t4}ms`);
 
-        // 解析插件内容（传入 configJson 以支持自定义路径）
+        // 使用内容解析器
         [skills, agents, commands, hooks, mcps, lsps, outputStyles] = await Promise.all([
-          this.parseSkills(localMarketPath, configJson),
-          this.parseAgents(localMarketPath, configJson),
-          this.parseCommands(localMarketPath, configJson),
-          this.parseHooks(localMarketPath, configJson),
-          this.parseMcps(localMarketPath, configJson),
-          this.parseLsps(localMarketPath, configJson),
-          this.parseOutputStyles(localMarketPath, configJson),
+          this.contentParser.parseSkills(localMarketPath, configJson),
+          this.contentParser.parseAgents(localMarketPath, configJson),
+          this.contentParser.parseCommands(localMarketPath, configJson),
+          this.contentParser.parseHooks(localMarketPath, configJson),
+          this.contentParser.parseMcps(localMarketPath, configJson),
+          this.contentParser.parseLsps(localMarketPath, configJson),
+          this.contentParser.parseOutputStyles(localMarketPath, configJson),
         ]);
 
         const t6 = Date.now();
         console.log(`[PluginDetailsService] Content parsing took ${t6 - t5}ms (skills:${skills.length}, agents:${agents.length}, commands:${commands.length}, hooks:${hooks.length}, mcps:${mcps.length}, lsps:${lsps.length}, outputStyles:${outputStyles.length})`);
       } catch (error) {
         console.error(`[PluginDetailsService] Local read failed:`, error);
-        // 本地读取失败，继续使用 GitHub 获取
       }
     }
 
@@ -514,161 +435,17 @@ export class PluginDetailsService {
   }
 
   /**
-   * 获取插件安装路径
-   * 在所有市场目录中搜索插件
-   * 实际路径结构:
-   * - ~/.claude/plugins/cache/{marketplace}/{pluginName}/{version}/
-   * - ~/.claude/plugins/marketplaces/{marketplace}/plugins/{pluginName}/
-   * @param pluginName 插件名称
-   * @param marketplace 市场名称（用于精确匹配）
-   */
-  public async getPluginPath(pluginName: string, marketplace?: string): Promise<string | null> {
-    const homeDir = process.env.HOME || process.env.USERPROFILE;
-    const cacheBasePath = path.join(homeDir || '', '.claude', 'plugins', 'cache');
-
-    // 搜索路径列表：缓存目录和市场目录
-    const searchPaths = [
-      cacheBasePath,
-      path.join(homeDir || '', '.claude', 'plugins', 'marketplaces'),
-    ];
-
-    for (const basePath of searchPaths) {
-      if (!homeDir) continue;
-
-      try {
-        // 列出所有市场目录
-        const marketplaces = await fs.readdir(basePath, { withFileTypes: true });
-
-        for (const market of marketplaces) {
-          if (!market.isDirectory()) continue;
-
-          // 如果指定了 marketplace，只搜索该市场
-          if (marketplace && market.name !== marketplace) {
-            continue;
-          }
-
-          const marketPath = path.join(basePath, market.name);
-
-          // 尝试查找插件目录（可能包含版本号）
-          try {
-            const items = await fs.readdir(marketPath, { withFileTypes: true });
-
-            for (const item of items) {
-              if (!item.isDirectory()) continue;
-
-              // 检查是否是目标插件目录（可能带版本号后缀）
-              if (item.name === pluginName || item.name.startsWith(pluginName + '@')) {
-                const pluginDirPath = path.join(marketPath, item.name);
-
-                // 尝试多种可能的配置文件位置
-                const configPaths = [
-                  path.join(pluginDirPath, 'package.json'),
-                  path.join(pluginDirPath, 'plugin.json'),
-                  path.join(pluginDirPath, '.claude-plugin', 'plugin.json'),
-                ];
-
-                let foundConfig = false;
-                for (const configPath of configPaths) {
-                  try {
-                    await fs.access(configPath);
-                    foundConfig = true;
-                    break;
-                  } catch {
-                    // 继续尝试下一个
-                  }
-                }
-
-                // 如果找到配置文件，返回插件目录
-                if (foundConfig) {
-                  return pluginDirPath;
-                }
-
-                // 如果没有找到配置文件，尝试查找版本子目录
-                try {
-                  const subItems = await fs.readdir(pluginDirPath, { withFileTypes: true });
-                  for (const subItem of subItems) {
-                    if (!subItem.isDirectory()) continue;
-
-                    const subDirPath = path.join(pluginDirPath, subItem.name);
-
-                    // 检查子目录中是否有配置文件或 README
-                    const subConfigPaths = [
-                      path.join(subDirPath, 'package.json'),
-                      path.join(subDirPath, 'plugin.json'),
-                      path.join(subDirPath, '.claude-plugin', 'plugin.json'),
-                      path.join(subDirPath, 'README.md'),
-                      path.join(subDirPath, 'readme.md'),
-                    ];
-
-                    for (const subConfigPath of subConfigPaths) {
-                      try {
-                        await fs.access(subConfigPath);
-                        // 找到配置文件或 README，返回版本目录
-                        return subDirPath;
-                      } catch {
-                        continue;
-                      }
-                    }
-                  }
-
-                  // 如果插件目录本身有 README.md，也返回
-                  for (const name of ['README.md', 'readme.md', 'Readme.md']) {
-                    try {
-                      await fs.access(path.join(pluginDirPath, name));
-                      return pluginDirPath;
-                    } catch {
-                      continue;
-                    }
-                  }
-                } catch {
-                  // 继续尝试其他插件目录
-                }
-              }
-            }
-          } catch {
-            continue;
-          }
-        }
-      } catch {
-        // 忽略错误，继续尝试其他路径
-      }
-    }
-
-    // 尝试项目目录
-    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (workspacePath) {
-      const projectPluginPath = path.join(workspacePath, '.claude', 'plugins', pluginName);
-      try {
-        await fs.access(projectPluginPath);
-        return projectPluginPath;
-      } catch {
-        // 继续尝试
-      }
-    }
-
-    return null;
-  }
-
-  /**
    * 读取 README 文件
    * 支持在插件目录或 .claude-plugin 目录中查找
    */
   public async readReadme(pluginPath: string): Promise<string> {
-    const readmeLocations = [
-      pluginPath,
-      path.join(pluginPath, '.claude-plugin'),
-    ];
-
+    const readmeLocations = [pluginPath, path.join(pluginPath, '.claude-plugin')];
     const readmeNames = ['README.md', 'readme.md', 'Readme.md'];
 
     for (const baseLocation of readmeLocations) {
       for (const name of readmeNames) {
-        const readmePath = path.join(baseLocation, name);
-        try {
-          return await fs.readFile(readmePath, 'utf-8');
-        } catch {
-          // 继续尝试下一个
-        }
+        const content = await tryReadFile(path.join(baseLocation, name));
+        if (content) return content;
       }
     }
     return '';
@@ -741,531 +518,11 @@ export class PluginDetailsService {
     }
   }
 
-
-  /**
-   * 解析 Skills
-   * 目录结构: skills/skill-name/SKILL.md
-   * 或者从 plugin.json 的 skills 字段获取自定义路径
-   *
-   * 自定义路径可能有两种情况:
-   * 1. 直接指向一个 skill 目录 (如 ./.claude/skills/ui-ux-pro-max)，该目录下有 SKILL.md
-   * 2. 指向一个 skills 集合目录，其子目录各有 SKILL.md
-   */
-  private async parseSkills(pluginPath: string, configJson?: any): Promise<SkillInfo[]> {
-    const skills: SkillInfo[] = [];
-
-    // 尝试从 plugin.json 获取自定义 skills 路径
-    const customPaths = getCustomPaths(configJson?.skills, pluginPath);
-
-    // 处理自定义路径（优先处理，因为这些路径是明确指定的）
-    for (const customPath of customPaths) {
-      const parsedFromCustom = await this.parseSkillPath(customPath);
-      for (const skill of parsedFromCustom) {
-        if (!skills.find(s => s.name === skill.name)) {
-          skills.push(skill);
-        }
-      }
-    }
-
-    // 如果没有从自定义路径获取到 skills，尝试默认路径
-    if (skills.length === 0) {
-      const defaultSkillsPath = path.join(pluginPath, 'skills');
-      const parsedFromDefault = await this.parseSkillPath(defaultSkillsPath);
-      for (const skill of parsedFromDefault) {
-        if (!skills.find(s => s.name === skill.name)) {
-          skills.push(skill);
-        }
-      }
-    }
-
-    return skills;
-  }
-
-  /**
-   * 解析一个 skill 路径
-   * 该路径可能:
-   * 1. 是一个 skill 目录（直接包含 SKILL.md）
-   * 2. 是一个 skills 集合目录（包含多个 skill 子目录）
-   */
-  private async parseSkillPath(skillPath: string): Promise<SkillInfo[]> {
-    const skills: SkillInfo[] = [];
-
-    try {
-      await fs.access(skillPath);
-
-      // 首先检查这个路径本身是否就是一个 skill 目录（包含 SKILL.md）
-      const ownSkillMdPath = path.join(skillPath, 'SKILL.md');
-      try {
-        const content = await fs.readFile(ownSkillMdPath, 'utf-8');
-        const skillName = path.basename(skillPath);
-        const skill = this.parseSkillMarkdown(skillName, content);
-        if (skill) {
-          skill.filePath = ownSkillMdPath;
-          skills.push(skill);
-          return skills; // 如果本身就是 skill 目录，直接返回
-        }
-      } catch {
-        // 不是 skill 目录，继续作为集合目录处理
-      }
-
-      // 作为 skills 集合目录处理，查找子目录中的 SKILL.md
-      const entries = await fs.readdir(skillPath, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-
-        const subSkillPath = path.join(skillPath, entry.name);
-        const subSkillMdPath = path.join(subSkillPath, 'SKILL.md');
-
-        try {
-          const content = await fs.readFile(subSkillMdPath, 'utf-8');
-          const skill = this.parseSkillMarkdown(entry.name, content);
-          if (skill) {
-            skill.filePath = subSkillMdPath;
-            skills.push(skill);
-          }
-        } catch {
-          // 该 skill 没有 SKILL.md，跳过
-          continue;
-        }
-      }
-    } catch {
-      // 路径不存在或无法访问
-    }
-
-    return skills;
-  }
-
-
-  /**
-   * 解析单个 Skill 的 Markdown 文件
-   */
-  private parseSkillMarkdown(skillName: string, content: string): SkillInfo | null {
-    const frontmatter = parseFrontmatter(content);
-    if (!frontmatter) return null;
-
-    return {
-      name: frontmatter.name || skillName,
-      description: frontmatter.description || '',
-      tools: frontmatter.tools,
-      allowedTools: frontmatter.allowedTools || frontmatter['allowed-tools'],
-      disableModelInvocation: frontmatter['disable-model-invocation'] === true,
-    };
-  }
-
-  /**
-   * 解析 Agents
-   * 目录结构: agents/agent-name.md
-   * 或者从 plugin.json 的 agents 字段获取自定义路径
-   */
-  private async parseAgents(pluginPath: string, configJson?: any): Promise<AgentInfo[]> {
-    const agents: AgentInfo[] = [];
-
-    // 尝试从 plugin.json 获取自定义 agents 路径
-    const customPaths = getCustomPaths(configJson?.agents, pluginPath);
-
-    // 收集所有要搜索的 agents 目录
-    const searchDirs: string[] = [...customPaths, path.join(pluginPath, 'agents')];
-
-    console.log(`[PluginDetailsService] parseAgents: searching in dirs:`, searchDirs);
-
-    for (const agentsDir of searchDirs) {
-      try {
-        await fs.access(agentsDir);
-        const entries = await fs.readdir(agentsDir);
-
-        console.log(`[PluginDetailsService] parseAgents: found dir ${agentsDir} with ${entries.length} entries`);
-
-        for (const entry of entries) {
-          if (!entry.endsWith('.md') || entry.startsWith('.')) continue;
-
-          const agentPath = path.join(agentsDir, entry);
-          try {
-            const content = await fs.readFile(agentPath, 'utf-8');
-            const agentName = entry.replace(/\.md$/, '');
-            const agent = this.parseAgentMarkdown(agentName, content);
-            console.log(`[PluginDetailsService] parseAgents: parsed agent ${agentName}, result:`, agent ? 'SUCCESS' : 'FAILED');
-            if (agent && !agents.find(a => a.name === agent.name)) {
-              agent.filePath = agentPath;
-              agents.push(agent);
-            }
-          } catch (error) {
-            console.log(`[PluginDetailsService] parseAgents: failed to read ${agentPath}:`, error);
-            continue;
-          }
-        }
-      } catch (error) {
-        console.log(`[PluginDetailsService] parseAgents: dir ${agentsDir} not accessible:`, error);
-        // 目录不存在，继续下一个
-      }
-    }
-
-    console.log(`[PluginDetailsService] parseAgents: returning ${agents.length} agents`);
-    return agents;
-  }
-
-  /**
-   * 解析单个 Agent 的 Markdown 文件
-   */
-  private parseAgentMarkdown(agentName: string, content: string): AgentInfo | null {
-    const frontmatter = parseFrontmatter(content);
-    if (!frontmatter) {
-      // 没有 frontmatter，返回基本信息
-      return { name: agentName, description: '' };
-    }
-
-    return {
-      name: frontmatter.name || agentName,
-      description: frontmatter.description || '',
-      model: frontmatter.model,
-    };
-  }
-
-  /**
-   * 解析 Commands
-   * 目录结构: commands/command-name.md
-   * 或者从 plugin.json 的 commands 字段获取自定义路径
-   */
-  private async parseCommands(pluginPath: string, configJson?: any): Promise<CommandInfo[]> {
-    const commands: CommandInfo[] = [];
-
-    // 尝试从 plugin.json 获取自定义 commands 路径
-    const customPaths = getCustomPaths(configJson?.commands, pluginPath);
-
-    // 收集所有要搜索的 commands 目录
-    const searchDirs: string[] = [...customPaths, path.join(pluginPath, 'commands')];
-
-    for (const commandsDir of searchDirs) {
-      try {
-        await fs.access(commandsDir);
-        const entries = await fs.readdir(commandsDir);
-
-        for (const entry of entries) {
-          if (!entry.endsWith('.md') || entry.startsWith('.')) continue;
-
-          const commandPath = path.join(commandsDir, entry);
-          try {
-            const content = await fs.readFile(commandPath, 'utf-8');
-            const commandName = entry.replace(/\.md$/, '');
-            const command = this.parseCommandMarkdown(commandName, content);
-            // 避免重复
-            if (!commands.find(c => c.name === command.name)) {
-              command.filePath = commandPath;
-              commands.push(command);
-            }
-          } catch {
-            // 即使无法解析，也添加基础信息
-            const name = entry.replace(/\.md$/, '');
-            if (!commands.find(c => c.name === name)) {
-              commands.push({ name, filePath: commandPath });
-            }
-          }
-        }
-      } catch {
-        // 目录不存在，继续下一个
-      }
-    }
-
-    return commands;
-  }
-
-  /**
-   * 解析单个 Command 的 Markdown 文件
-   */
-  private parseCommandMarkdown(commandName: string, content: string): CommandInfo {
-    // 尝试从 frontmatter 获取描述
-    const frontmatter = parseFrontmatter(content);
-    if (frontmatter) {
-      return {
-        name: commandName,
-        description: frontmatter.description,
-      };
-    }
-
-    // 尝试从第一行获取描述
-    const firstLine = content.split('\n').find(line => line.trim() && !line.startsWith('#'));
-    return {
-      name: commandName,
-      description: firstLine?.trim().replace(/^#\s*/, ''),
-    };
-  }
-
-  /**
-   * 解析 Hooks
-   * 文件: hooks/hooks.json
-   * 或者从 plugin.json 的 hooks 字段获取配置（可能是内联的）
-   */
-  private async parseHooks(pluginPath: string, configJson?: any): Promise<HookInfo[]> {
-    const hooks: HookInfo[] = [];
-
-    // 首先检查 plugin.json 中是否有内联的 hooks 配置
-    if (configJson?.hooks) {
-      // hooks 可能是路径字符串，也可能是内联配置对象
-      if (typeof configJson.hooks === 'string') {
-        // 是路径，读取文件
-        try {
-          const hooksPath = path.join(pluginPath, configJson.hooks.replace(/^\.\//, ''));
-          const content = await fs.readFile(hooksPath, 'utf-8');
-          const config = JSON.parse(content) as { hooks?: Record<string, any[]> };
-          if (config.hooks) {
-            hooks.push(...this.parseHooksConfig(config.hooks, hooksPath));
-          }
-        } catch {
-          // 忽略错误
-        }
-      } else if (typeof configJson.hooks === 'object') {
-        // 内联配置，没有文件路径
-        hooks.push(...this.parseHooksConfig(configJson.hooks));
-      }
-    }
-
-    // 如果没有从 plugin.json 获取到 hooks，尝试默认位置
-    if (hooks.length === 0) {
-      const hooksJsonPath = path.join(pluginPath, 'hooks', 'hooks.json');
-      try {
-        const content = await fs.readFile(hooksJsonPath, 'utf-8');
-        const config = JSON.parse(content) as { hooks?: Record<string, any[]> };
-        if (config.hooks) {
-          hooks.push(...this.parseHooksConfig(config.hooks, hooksJsonPath));
-        }
-      } catch {
-        // hooks.json 不存在或解析失败
-      }
-    }
-
-    return hooks;
-  }
-
-  /**
-   * 解析 hooks 配置对象
-   */
-  private parseHooksConfig(hooksConfig: Record<string, any[]>, filePath?: string): HookInfo[] {
-    const hooks: HookInfo[] = [];
-    for (const [event, hookConfigs] of Object.entries(hooksConfig)) {
-      const configs = Array.isArray(hookConfigs) ? hookConfigs : [hookConfigs];
-      const hookInfo: HookInfo = {
-        event,
-        hooks: configs.map((c: any) => ({
-          type: c.type,
-          matcher: c.matcher,
-          command: c.command,
-          skill: c.skill,
-          async: c.async,
-        })),
-      };
-      if (filePath) {
-        hookInfo.filePath = filePath;
-      }
-      hooks.push(hookInfo);
-    }
-    return hooks;
-  }
-
-  /**
-   * 解析 MCP Servers
-   * 文件: .mcp.json
-   * 或者从 plugin.json 的 mcpServers 字段获取配置（可能是内联的）
-   */
-  private async parseMcps(pluginPath: string, configJson?: any): Promise<McpInfo[]> {
-    const mcps: McpInfo[] = [];
-
-    // 首先检查 plugin.json 中是否有 mcpServers 配置
-    if (configJson?.mcpServers) {
-      if (typeof configJson.mcpServers === 'string') {
-        // 是路径，读取文件
-        try {
-          const mcpPath = path.join(pluginPath, configJson.mcpServers.replace(/^\.\//, ''));
-          const content = await fs.readFile(mcpPath, 'utf-8');
-          mcps.push(...this.parseMcpConfig(JSON.parse(content), mcpPath));
-        } catch {
-          // 忽略错误
-        }
-      } else if (typeof configJson.mcpServers === 'object') {
-        // 内联配置，没有文件路径
-        mcps.push(...this.parseMcpConfig(configJson.mcpServers));
-      }
-    }
-
-    // 如果没有从 plugin.json 获取到 mcp，尝试默认位置
-    if (mcps.length === 0) {
-      const mcpJsonPath = path.join(pluginPath, '.mcp.json');
-      try {
-        const content = await fs.readFile(mcpJsonPath, 'utf-8');
-        mcps.push(...this.parseMcpConfig(JSON.parse(content), mcpJsonPath));
-      } catch {
-        // .mcp.json 不存在或解析失败
-      }
-    }
-
-    return mcps;
-  }
-
-  /**
-   * 解析 MCP 配置对象
-   */
-  private parseMcpConfig(config: any, filePath?: string): McpInfo[] {
-    const mcps: McpInfo[] = [];
-    // .mcp.json 可能是 { "mcpServers": { ... } } 或直接服务配置
-    const servers = config.mcpServers || config;
-
-    if (typeof servers === 'object') {
-      for (const [name, serverConfig] of Object.entries(servers)) {
-        if (typeof serverConfig === 'object' && serverConfig !== null) {
-          const cfg = serverConfig as any;
-          const mcpInfo: McpInfo = {
-            name,
-            command: cfg.command,
-            args: cfg.args,
-            env: cfg.env,
-            description: cfg.description || cfg.url || cfg.type,
-            type: cfg.type,
-            url: cfg.url,
-          };
-          if (filePath) {
-            mcpInfo.filePath = filePath;
-          }
-          mcps.push(mcpInfo);
-        }
-      }
-    }
-    return mcps;
-  }
-
-  /**
-   * 解析 LSP Servers
-   * 文件: .lsp.json
-   * 或者从 plugin.json 的 lspServers 字段获取配置（可能是内联的）
-   */
-  private async parseLsps(pluginPath: string, configJson?: any): Promise<LspInfo[]> {
-    const lsps: LspInfo[] = [];
-
-    // 首先检查 plugin.json 中是否有 lspServers 配置
-    if (configJson?.lspServers) {
-      if (typeof configJson.lspServers === 'string') {
-        // 是路径，读取文件
-        try {
-          const lspPath = path.join(pluginPath, configJson.lspServers.replace(/^\.\//, ''));
-          const content = await fs.readFile(lspPath, 'utf-8');
-          lsps.push(...this.parseLspConfig(JSON.parse(content), lspPath));
-        } catch {
-          // 忽略错误
-        }
-      } else if (typeof configJson.lspServers === 'object') {
-        // 内联配置，没有文件路径
-        lsps.push(...this.parseLspConfig(configJson.lspServers));
-      }
-    }
-
-    // 如果没有从 plugin.json 获取到 lsp，尝试默认位置
-    if (lsps.length === 0) {
-      const lspJsonPath = path.join(pluginPath, '.lsp.json');
-      try {
-        const content = await fs.readFile(lspJsonPath, 'utf-8');
-        lsps.push(...this.parseLspConfig(JSON.parse(content), lspJsonPath));
-      } catch {
-        // .lsp.json 不存在或解析失败
-      }
-    }
-
-    return lsps;
-  }
-
-  /**
-   * 解析 LSP 配置对象
-   */
-  private parseLspConfig(config: any, filePath?: string): LspInfo[] {
-    const lsps: LspInfo[] = [];
-    if (typeof config === 'object') {
-      for (const [language, lspConfig] of Object.entries(config)) {
-        if (typeof lspConfig === 'object' && lspConfig !== null) {
-          const lspInfo: LspInfo = {
-            language,
-            command: (lspConfig as any).command || language,
-            args: (lspConfig as any).args,
-            extensionToLanguage: (lspConfig as any).extensionToLanguage,
-          };
-          if (filePath) {
-            lspInfo.filePath = filePath;
-          }
-          lsps.push(lspInfo);
-        }
-      }
-    }
-    return lsps;
-  }
-
-  /**
-   * 解析 Output Styles
-   * 目录结构: outputStyles/ 或自定义路径
-   * 来自 plugin.json 的 outputStyles 字段
-   */
-  private async parseOutputStyles(pluginPath: string, configJson?: any): Promise<OutputStyleInfo[]> {
-    const outputStyles: OutputStyleInfo[] = [];
-
-    // 尝试从 plugin.json 获取自定义 outputStyles 路径
-    const customPaths = getCustomPaths(configJson?.outputStyles, pluginPath);
-
-    // 收集所有要搜索的 outputStyles 路径
-    const searchPaths: string[] = [...customPaths, path.join(pluginPath, 'outputStyles')];
-
-    for (const styleBasePath of searchPaths) {
-      try {
-        await fs.access(styleBasePath);
-        const entries = await fs.readdir(styleBasePath, { withFileTypes: true });
-
-        for (const entry of entries) {
-          if (entry.name.startsWith('.')) continue;
-
-          const styleName = entry.name;
-          const stylePath = path.join(styleBasePath, entry.name);
-
-          // 检查是文件还是目录
-          try {
-            const stat = await fs.stat(stylePath);
-            outputStyles.push({
-              name: styleName,
-              type: stat.isDirectory() ? 'directory' : 'file',
-              filePath: stylePath
-            });
-          } catch {
-            // 无法获取状态，默认添加为目录
-            outputStyles.push({
-              name: styleName,
-              type: 'directory',
-              filePath: stylePath
-            });
-          }
-        }
-      } catch {
-        // 路径不存在，继续下一个
-      }
-    }
-
-    return outputStyles;
-  }
-
-
   /**
    * 解析仓库信息
    */
   public parseRepository(packageJson: any): RepositoryInfo | undefined {
-    const repo = packageJson.repository;
-    if (!repo) return undefined;
-
-    if (typeof repo === 'string') {
-      if (repo.includes('github.com')) {
-        return { type: 'github', url: repo };
-      }
-      return { type: 'other', url: repo };
-    }
-
-    if (repo.type === 'github') {
-      return {
-        type: 'github',
-        url: `https://github.com/${repo.owner}/${repo.name}`
-      };
-    }
-
-    return { type: 'other', url: repo.url || '' };
+    return parseRepositoryUtil(packageJson);
   }
 
   /**

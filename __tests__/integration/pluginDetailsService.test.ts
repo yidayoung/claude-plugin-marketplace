@@ -9,6 +9,8 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
 import { PluginDetailsService } from '../../src/pluginMarketplace/webview/services/PluginDetailsService';
+import { PluginPathResolver } from '../../src/pluginMarketplace/webview/services/PluginPathResolver';
+import { ContentParser } from '../../src/pluginMarketplace/webview/services/ContentParser';
 
 // Mock vscode 模块
 jest.mock('vscode', () => ({
@@ -28,6 +30,8 @@ describe('PluginDetailsService 集成测试', () => {
   const installedPluginsPath = path.join(homeDir, '.claude', 'plugins', 'installed_plugins.json');
 
   let service: PluginDetailsService;
+  let pathResolver: PluginPathResolver;
+  let contentParser: ContentParser;
   let mockContext: any;
 
   // 收集实际已安装的插件用于测试
@@ -43,6 +47,8 @@ describe('PluginDetailsService 集成测试', () => {
     };
 
     service = new PluginDetailsService(mockContext);
+    pathResolver = new PluginPathResolver(mockContext);
+    contentParser = new ContentParser();
 
     // 读取已安装插件列表
     try {
@@ -60,7 +66,7 @@ describe('PluginDetailsService 集成测试', () => {
     }
   });
 
-  describe('getPluginPath - 真实实现测试', () => {
+  describe('PluginPathResolver - 真实实现测试', () => {
     it('应能找到已安装插件的路径', async () => {
       if (installedPlugins.length === 0) {
         console.log('  ⚠ 跳过 - 没有已安装的插件');
@@ -70,21 +76,21 @@ describe('PluginDetailsService 集成测试', () => {
       const plugin = installedPlugins[0];
       console.log(`  测试插件: ${plugin.name}`);
 
-      const pluginPath = await service.getPluginPath(plugin.name);
+      const pluginPath = await pathResolver.findPluginPath(plugin.name);
 
       expect(pluginPath).not.toBeNull();
       console.log(`  ✓ 找到路径: ${pluginPath}`);
     });
 
     it('应能找到 superpowers 插件', async () => {
-      const pluginPath = await service.getPluginPath('superpowers');
+      const pluginPath = await pathResolver.findPluginPath('superpowers');
 
       expect(pluginPath).not.toBeNull();
       console.log(`  ✓ superpowers 路径: ${pluginPath}`);
     });
 
     it('找不到的插件应返回 null', async () => {
-      const pluginPath = await service.getPluginPath('nonexistent-plugin-xyz-123');
+      const pluginPath = await pathResolver.findPluginPath('nonexistent-plugin-xyz-123');
 
       expect(pluginPath).toBeNull();
       console.log(`  ✓ 不存在的插件返回 null`);
@@ -100,7 +106,7 @@ describe('PluginDetailsService 集成测试', () => {
 
       // 找一个有 README 的插件
       for (const plugin of installedPlugins.slice(0, 3)) {
-        const pluginPath = await service.getPluginPath(plugin.name);
+        const pluginPath = await pathResolver.findPluginPath(plugin.name);
         if (!pluginPath) continue;
 
         const readme = await service.readReadme(pluginPath);
@@ -120,7 +126,7 @@ describe('PluginDetailsService 集成测试', () => {
   describe('parseRepository - 真实实现测试', () => {
     it('应能解析真实插件的 repository', async () => {
       // 读取 superpowers 的配置
-      const pluginPath = await service.getPluginPath('superpowers');
+      const pluginPath = await pathResolver.findPluginPath('superpowers');
       if (!pluginPath) {
         console.log('  ⚠ 跳过 - superpowers 未安装');
         return;
@@ -141,7 +147,7 @@ describe('PluginDetailsService 集成测试', () => {
 
   describe('parseDependencies - 真实实现测试', () => {
     it('应能解析真实插件的依赖', async () => {
-      const pluginPath = await service.getPluginPath('superpowers');
+      const pluginPath = await pathResolver.findPluginPath('superpowers');
       if (!pluginPath) {
         console.log('  ⚠ 跳过 - superpowers 未安装');
         return;
@@ -196,21 +202,21 @@ describe('PluginDetailsService 集成测试', () => {
       console.log(`  配置中的 name: ${config.name}`);
 
       // 测试 parseSkills
-      const skills = await (service as any).parseSkills(pluginPath);
+      const skills = await contentParser.parseSkills(pluginPath, config);
       console.log(`  ✓ Skills 数量: ${skills.length}`);
       if (skills.length > 0) {
         console.log(`    前 3 个: ${skills.slice(0, 3).map((s: any) => s.name).join(', ')}`);
       }
 
       // 测试 parseAgents
-      const agents = await (service as any).parseAgents(pluginPath);
+      const agents = await contentParser.parseAgents(pluginPath, config);
       console.log(`  ✓ Agents 数量: ${agents.length}`);
       if (agents.length > 0) {
         console.log(`    前 3 个: ${agents.slice(0, 3).map((a: any) => a.name).join(', ')}`);
       }
 
       // 测试 parseCommands
-      const commands = await (service as any).parseCommands(pluginPath);
+      const commands = await contentParser.parseCommands(pluginPath, config);
       console.log(`  ✓ Commands 数量: ${commands.length}`);
 
       expect(skills.length).toBeGreaterThan(0);
@@ -228,7 +234,7 @@ describe('PluginDetailsService 集成测试', () => {
       await fs.access(localMarketPath);
 
       // 测试 parseAgents
-      const agents = await (service as any).parseAgents(localMarketPath);
+      const agents = await contentParser.parseAgents(localMarketPath);
       console.log(`  ✓ Agents 数量: ${agents.length}`);
       if (agents.length > 0) {
         console.log(`    Agents: ${agents.map((a: any) => a.name).join(', ')}`);
