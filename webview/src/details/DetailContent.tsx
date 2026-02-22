@@ -20,7 +20,7 @@ const DetailContent: React.FC<DetailContentProps> = ({ plugin, onOpenFile }) => 
       {plugin.description && (
         <Space direction="vertical" size={12} style={{
           padding: 16,
-          background: 'var(--vscode-editor-background)',
+          background: 'var(--vscode-sideBar-background)',
           borderRadius: 8,
           border: '1px solid var(--vscode-panel-border)',
           width: '100%'
@@ -41,7 +41,7 @@ const DetailContent: React.FC<DetailContentProps> = ({ plugin, onOpenFile }) => 
       {(plugin.dependencies?.length || plugin.license) && (
         <Space direction="vertical" size={12} style={{
           padding: 16,
-          background: 'var(--vscode-editor-background)',
+          background: 'var(--vscode-sideBar-background)',
           borderRadius: 8,
           border: '1px solid var(--vscode-panel-border)',
           width: '100%'
