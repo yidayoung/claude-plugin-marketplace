@@ -10,7 +10,6 @@ import {
   FolderOpenOutlined,
   GithubOutlined,
   LinkOutlined,
-  CopyOutlined,
   StarFilled
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
@@ -25,7 +24,6 @@ interface DetailHeaderProps {
   onEnable: () => void;
   onDisable: () => void;
   onOpenExternal: (url: string) => void;
-  onCopy: (text: string) => void;
   onOpenDirectory?: (directoryPath: string) => void;
 }
 
@@ -42,11 +40,53 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
   onEnable,
   onDisable,
   onOpenExternal,
-  onCopy,
   onOpenDirectory
 }) => {
   const isDisabled = plugin.installed && plugin.enabled === false;
   const scopeInfo = plugin.scope ? scopeConfig[plugin.scope] : null;
+
+  // 根据市场源信息生成 URL
+  const getMarketplaceUrl = (plugin: PluginDetailData): string | null => {
+    if (!plugin.marketplaceSource) {
+      return null;
+    }
+
+    const { source, repo, url } = plugin.marketplaceSource;
+
+    // GitHub 市场
+    if (source === 'github' && repo) {
+      return `https://github.com/${repo}`;
+    }
+
+    // URL 市场
+    if (source === 'url' && url) {
+      return url;
+    }
+
+    // Git 市场（如果有 URL）
+    if (source === 'git' && url) {
+      return url;
+    }
+
+    // Directory 类型是本地的，没有 URL
+    return null;
+  };
+
+  // 生成市场标题提示
+  const getMarketplaceTitle = (plugin: PluginDetailData): string => {
+    if (!plugin.marketplaceSource) {
+      return '未知市场类型';
+    }
+
+    const { source } = plugin.marketplaceSource;
+
+    if (source === 'directory') {
+      return '本地市场';
+    }
+
+    const url = getMarketplaceUrl(plugin);
+    return url ? `打开市场链接: ${url}` : '本地市场';
+  };
 
   const handleUninstallWithConfirm = () => {
     Modal.confirm({
@@ -75,9 +115,6 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
     }
   ];
 
-  const copyInstallCommand = () => {
-    onCopy(`claude plugin install "${plugin.name}@${plugin.marketplace}"`);
-  };
 
   return (
     <div style={{ marginBottom: 24 }}>
@@ -102,7 +139,24 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
           </Space>
           <Text type="secondary" style={{ fontSize: 13 }}>
             {plugin.author && `作者: ${plugin.author} · `}
-            来自 {plugin.marketplace}
+            来自{' '}
+            <Text
+              style={{
+                cursor: getMarketplaceUrl(plugin) ? 'pointer' : 'default',
+                textDecoration: getMarketplaceUrl(plugin) ? 'underline' : 'none',
+                textDecorationStyle: getMarketplaceUrl(plugin) ? 'dashed' : 'solid',
+                textUnderlineOffset: 2
+              }}
+              onClick={() => {
+                const marketplaceUrl = getMarketplaceUrl(plugin);
+                if (marketplaceUrl) {
+                  onOpenExternal(marketplaceUrl);
+                }
+              }}
+              title={getMarketplaceTitle(plugin)}
+            >
+              {plugin.marketplace}
+            </Text>
             {plugin.repository?.stars && (
               <span>
                 {' '}· <StarFilled style={{ color: '#faad14' }} /> {plugin.repository.stars}
@@ -154,14 +208,6 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
                   {scopeInfo.label}
                 </Tag>
               )}
-              <Tooltip title="复制安装命令">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CopyOutlined />}
-                  onClick={copyInstallCommand}
-                />
-              </Tooltip>
               <Tooltip title="卸载">
                 <Button
                   type="text"

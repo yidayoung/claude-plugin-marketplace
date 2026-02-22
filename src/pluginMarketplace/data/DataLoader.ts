@@ -7,6 +7,7 @@ import { execClaudeCommand, InstalledPlugin } from '../types';
 import { MarketplaceInfo, PluginInfo } from './types';
 import { PluginDetailData } from '../webview/messages/types';
 import { PluginDetailsService } from '../webview/services/PluginDetailsService';
+import { logger } from '../../shared/utils/logger';
 
 /**
  * 数据加载器
@@ -33,7 +34,7 @@ export class DataLoader {
     });
 
     if (result.status !== 'success') {
-      console.error('[DataLoader] Failed to load installed plugins:', result.error);
+      logger.error('加载已安装插件列表失败:', result.error);
       throw new Error(result.error || 'Failed to list installed plugins');
     }
 
@@ -41,7 +42,6 @@ export class DataLoader {
 
     // CLI 返回的可能是数组格式
     if (Array.isArray(result.data)) {
-      console.log('[DataLoader] Data is array, length:', result.data.length);
       for (const plugin of result.data) {
         // CLI 返回的格式: { id: "name@marketplace", version, enabled, scope, installPath }
         // 需要从 id 字段解析出 name 和 marketplace
@@ -63,19 +63,14 @@ export class DataLoader {
           scope: plugin.scope,
           installPath: plugin.installPath
         });
-
-        console.log(`[DataLoader] Loaded plugin: ${name}@${marketplace || ''}, enabled=${plugin.enabled}, default=${plugin.enabled ?? true}`);
       }
     } else {
       // 或者是对象格式 { plugins: { "name@marketplace": [entries] } }
       const pluginsData = result.data?.plugins || result.data || {};
-      console.log('[DataLoader] Data is object, keys:', Object.keys(pluginsData));
-      console.log('[DataLoader] First entry sample:', JSON.stringify(pluginsData[Object.keys(pluginsData)[0]]));
 
       for (const [key, entries] of Object.entries(pluginsData)) {
         // key 格式: "name@marketplace"
         const [name, marketplace] = key.split('@');
-        console.log('[DataLoader] Parsing entry - key:', key, 'name:', name, 'marketplace:', marketplace);
 
         // 取第一个安装条目（通常只有一个）
         const firstEntry = (entries as any[])[0];
@@ -92,7 +87,7 @@ export class DataLoader {
       }
     }
 
-    console.log('[DataLoader] Loaded', installedPlugins.length, 'installed plugins');
+    logger.debug(`加载了 ${installedPlugins.length} 个已安装插件`);
     return installedPlugins;
   }
 
@@ -118,7 +113,7 @@ export class DataLoader {
         source: info.source,
       }));
     } catch (error) {
-      console.error('[DataLoader] Failed to load known_marketplaces.json:', error);
+      logger.error('加载 known_marketplaces.json 失败:', error);
       return [];
     }
   }
@@ -152,7 +147,7 @@ export class DataLoader {
         scope: undefined, // 初始化为 undefined
       }));
     } catch (error) {
-      console.error(`[DataLoader] Failed to load plugins for ${marketplace.name}:`, error);
+      logger.error(`加载市场 ${marketplace.name} 的插件列表失败:`, error);
       return [];
     }
   }

@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { logger } from '../shared/utils/logger';
 
 const execAsync = promisify(exec);
 
@@ -88,15 +89,10 @@ export async function execClaudeCommand(
       }
     );
 
-    // 记录命令执行结果，方便调试
-    console.log(`[execClaudeCommand] Command: claude ${command}`);
-    console.log(`[execClaudeCommand] stdout length: ${stdout?.length || 0}`);
-    console.log(`[execClaudeCommand] stderr: ${stderr || '(empty)'}`);
-
     // 检查 stderr 是否包含错误信息
     if (stderr && stderr.trim() && !stderr.includes('warning') && !stderr.includes('deprecated')) {
       // 如果 stderr 有内容且不是警告，可能是错误
-      console.warn(`[execClaudeCommand] stderr detected:`, stderr);
+      logger.warn(`CLI 命令 stderr:`, stderr);
     }
 
     // 解析 JSON 输出

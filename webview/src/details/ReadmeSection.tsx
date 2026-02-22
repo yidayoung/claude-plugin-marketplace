@@ -1,8 +1,8 @@
 // vscode-extension/webview/src/details/ReadmeSection.tsx
 
-import React, { useState } from 'react';
-import { Typography, Button, Space } from 'antd';
-import { FileTextOutlined, EyeOutlined, CodeOutlined } from '@ant-design/icons';
+import React from 'react';
+import { Typography, Space } from 'antd';
+import { FileTextOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkSlug from 'remark-slug';
@@ -78,8 +78,6 @@ const MarkdownImage: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = (prop
 };
 
 const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme }) => {
-  const [viewMode, setViewMode] = useState<'rendered' | 'raw'>('rendered');
-
   if (!readme) {
     return null;
   }
@@ -92,46 +90,21 @@ const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme }) => {
       border: '1px solid var(--vscode-panel-border)',
       width: '100%'
     }}>
-      <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-        <Title level={5} style={{ margin: 0 }}>
-          <FileTextOutlined /> README
-        </Title>
-        <Button
-          type="text"
-          size="small"
-          icon={viewMode === 'rendered' ? <CodeOutlined /> : <EyeOutlined />}
-          onClick={() => setViewMode(viewMode === 'rendered' ? 'raw' : 'rendered')}
-        >
-          {viewMode === 'rendered' ? '查看源码' : '预览'}
-        </Button>
-      </Space>
-      {viewMode === 'rendered' ? (
-        <div className="markdown-body">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, [remarkSlug as any]]}
-            rehypePlugins={[rehypeRaw]}
-            components={{
-              a: MarkdownLink as any,
-              img: MarkdownImage as any,
-            }}
-          >
-            {readme}
-          </ReactMarkdown>
-        </div>
-      ) : (
-        <pre
-          style={{
-            background: 'var(--vscode-textBlockQuote-background)',
-            padding: 16,
-            borderRadius: 4,
-            overflow: 'auto',
-            fontSize: 13,
-            margin: 0
+      <Title level={5} style={{ margin: 0 }}>
+        <FileTextOutlined /> README
+      </Title>
+      <div className="markdown-body">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, [remarkSlug as any]]}
+          rehypePlugins={[rehypeRaw]}
+          components={{
+            a: MarkdownLink as any,
+            img: MarkdownImage as any,
           }}
         >
           {readme}
-        </pre>
-      )}
+        </ReactMarkdown>
+      </div>
     </Space>
   );
 };

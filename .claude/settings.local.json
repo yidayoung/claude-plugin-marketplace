@@ -22,7 +22,5 @@
       "Bash(npx tsc-alias:*)"
     ]
   },
-  "enabledPlugins": {
-    "superpowers@superpowers-marketplace": true
-  }
+  "enabledPlugins": {}
 }

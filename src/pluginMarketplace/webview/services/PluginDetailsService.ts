@@ -20,6 +20,7 @@ import { PluginPathResolver } from './PluginPathResolver';
 import { ContentParser } from './ContentParser';
 import { tryReadFile } from '@shared/utils/fileUtils';
 import { parseFrontmatter, parseGitHubRepo, getCustomPaths, parseRepository as parseRepositoryUtil } from '@shared/utils/parseUtils';
+import { logger } from '../../../shared/utils/logger';
 
 /**
  * 插件详情缓存条目
@@ -42,10 +43,46 @@ export class PluginDetailsService {
   private localPathCache = new Map<string, string>();
   private pathResolver: PluginPathResolver;
   private contentParser: ContentParser;
+  // FileParser 单例缓存
+  private fileParserInstance: any = null;
 
   constructor(private context: vscode.ExtensionContext) {
     this.pathResolver = new PluginPathResolver(context);
     this.contentParser = new ContentParser();
+  }
+
+  /**
+   * 获取 FileParser 单例
+   */
+  private async getFileParser() {
+    if (!this.fileParserInstance) {
+      const { FileParser } = await import('./FileParser');
+      this.fileParserInstance = new FileParser();
+    }
+    return this.fileParserInstance;
+  }
+
+  /**
+   * 获取插件安装状态（从文件解析）
+   * 提取为公共方法以避免重复代码
+   */
+  private async getPluginStatusFromFiles(pluginName: string, marketplace: string) {
+    const parser = await this.getFileParser();
+    const [installedPlugins, enabledMap] = await Promise.all([
+      parser.parseInstalledPlugins(),
+      parser.parseEnabledPlugins()
+    ]);
+
+    const installedInfo = installedPlugins.find((p: any) => p.name === pluginName && p.marketplace === marketplace);
+    const key = `${pluginName}@${marketplace}`;
+    const isEnabled = enabledMap.get(key);
+
+    return {
+      installed: !!installedInfo,
+      enabled: isEnabled ?? true,
+      scope: installedInfo?.scope,
+      actualMarketplace: installedInfo?.marketplace || marketplace
+    };
   }
 
   /**
@@ -121,7 +158,7 @@ export class PluginDetailsService {
   clearAllCache(): void {
     this.cache.clear();
     this.localPathCache.clear();
-    console.log('[PluginDetailsService] All caches cleared');
+    logger.debug('已清除所有缓存');
   }
 
   /**
@@ -139,7 +176,7 @@ export class PluginDetailsService {
     // 使用路径解析器查找插件
     const pluginPath = await this.pathResolver.findPluginPath(pluginName, marketplace);
     if (!pluginPath) {
-      console.log(`[PluginDetailsService] Plugin ${pluginName}@${marketplace} not found locally, fetching from remote`);
+      logger.debug(`插件 ${pluginName}@${marketplace} 未在本地找到，从远程获取`);
       return this.getRemotePluginDetail(pluginName, marketplace, enabledFromStore, scopeFromStore);
     }
 
@@ -160,7 +197,7 @@ export class PluginDetailsService {
 
     // 如果没有内容，尝试从远程获取
     if (!readme && skills.length === 0 && agents.length === 0 && commands.length === 0) {
-      console.log(`[PluginDetailsService] Plugin ${pluginName} has no local content, fetching from remote`);
+      logger.debug(`插件 ${pluginName} 无本地内容，从远程获取`);
       return this.getRemotePluginDetail(pluginName, marketplace);
     }
 
@@ -170,20 +207,10 @@ export class PluginDetailsService {
     let actualMarketplace = marketplace;
 
     if (enabledFromStore === undefined || scopeFromStore === undefined) {
-      const { FileParser } = await import('./FileParser');
-      const parser = new FileParser();
-      const [installedPlugins, enabledMap] = await Promise.all([
-        parser.parseInstalledPlugins(),
-        parser.parseEnabledPlugins()
-      ]);
-
-      const installedInfo = installedPlugins.find(p => p.name === pluginName && p.marketplace === marketplace);
-      const key = `${pluginName}@${marketplace}`;
-      const isEnabled = enabledMap.get(key);
-
-      enabled = enabledFromStore ?? isEnabled ?? true;
-      scope = scopeFromStore ?? installedInfo?.scope;
-      actualMarketplace = installedInfo?.marketplace || marketplace;
+      const status = await this.getPluginStatusFromFiles(pluginName, marketplace);
+      enabled = enabledFromStore ?? status.enabled;
+      scope = scopeFromStore ?? status.scope;
+      actualMarketplace = status.actualMarketplace;
     }
 
     const repository = configJson ? parseRepositoryUtil(configJson) : undefined;
@@ -252,14 +279,10 @@ export class PluginDetailsService {
     enabledFromStore?: boolean,
     scopeFromStore?: 'user' | 'project' | 'local'
   ): Promise<PluginDetailData> {
-    const startTime = Date.now();
-    console.log(`[PluginDetailsService] Loading remote plugin: ${pluginName}@${marketplace}`);
-
     // 从文件解析器获取市场信息
-    const { FileParser } = await import('./FileParser');
-    const parser = new FileParser();
+    const parser = await this.getFileParser();
     const marketplaces = await parser.parseMarketplaces();
-    const market = marketplaces.find(m => m.name === marketplace);
+    const market = marketplaces.find((m: any) => m.name === marketplace);
 
     if (!market) {
       throw new Error(`找不到市场 ${marketplace}`);
@@ -268,7 +291,7 @@ export class PluginDetailsService {
     // 获取插件列表找到目标插件
     const config = await parser.parseMarketplacePlugins(marketplace);
     const plugins = config?.plugins || [];
-    const plugin = plugins.find(p => p.name === pluginName);
+    const plugin = plugins.find((p: any) => p.name === pluginName);
 
     if (!plugin) {
       throw new Error(`找不到插件 ${pluginName}@${marketplace}`);
@@ -287,9 +310,6 @@ export class PluginDetailsService {
       }
     }
 
-    const t1 = Date.now();
-    console.log(`[PluginDetailsService] Cache lookup took ${t1 - startTime}ms`);
-
     let readme = '';
     let skills: SkillInfo[] = [];
     let agents: AgentInfo[] = [];
@@ -304,14 +324,10 @@ export class PluginDetailsService {
     let configJson: any = undefined;
 
     // 使用路径解析器获取本地市场路径
-    const t2 = Date.now();
     const localMarketPath = await this.pathResolver.getLocalMarketPath(pluginName, marketplace);
-    console.log(`[PluginDetailsService] Path lookup took ${Date.now() - t2}ms, found: ${localMarketPath ? 'YES' : 'NO'}`);
 
     if (localMarketPath) {
       try {
-        const t3 = Date.now();
-
         // 读取配置文件
         try {
           const configPath = path.join(localMarketPath, '.claude-plugin', 'plugin.json');
@@ -325,14 +341,8 @@ export class PluginDetailsService {
           // 配置文件不存在，继续
         }
 
-        const t4 = Date.now();
-        console.log(`[PluginDetailsService] Config read took ${t4 - t3}ms`);
-
         // 读取 README
         readme = await this.readReadme(localMarketPath);
-
-        const t5 = Date.now();
-        console.log(`[PluginDetailsService] README read took ${t5 - t4}ms`);
 
         // 使用内容解析器
         [skills, agents, commands, hooks, mcps, lsps, outputStyles] = await Promise.all([
@@ -344,11 +354,8 @@ export class PluginDetailsService {
           this.contentParser.parseLsps(localMarketPath, configJson),
           this.contentParser.parseOutputStyles(localMarketPath, configJson),
         ]);
-
-        const t6 = Date.now();
-        console.log(`[PluginDetailsService] Content parsing took ${t6 - t5}ms (skills:${skills.length}, agents:${agents.length}, commands:${commands.length}, hooks:${hooks.length}, mcps:${mcps.length}, lsps:${lsps.length}, outputStyles:${outputStyles.length})`);
       } catch (error) {
-        console.error(`[PluginDetailsService] Local read failed:`, error);
+        logger.error(`本地读取失败:`, error);
       }
     }
 
@@ -388,9 +395,6 @@ export class PluginDetailsService {
       }
     }
 
-    const totalTime = Date.now() - startTime;
-    console.log(`[PluginDetailsService] Total loading time for ${pluginName}@${marketplace}: ${totalTime}ms`);
-
     // 判断是否为远程源（本地没有完整解析的数据）
     const isRemoteSource = !localMarketPath || (skills.length === 0 && agents.length === 0 && commands.length === 0 && hooks.length === 0 && mcps.length === 0 && lsps.length === 0 && !readme);
 
@@ -401,15 +405,10 @@ export class PluginDetailsService {
 
     if (enabledFromStore === undefined || scopeFromStore === undefined) {
       // 只有在 Store 没有传递状态时才从文件解析（保持兼容性）
-      const installedPlugins = await parser.parseInstalledPlugins();
-      const installedInfo = installedPlugins.find(p => p.name === pluginName && p.marketplace === marketplace);
-      const key = `${pluginName}@${marketplace}`;
-      const enabledMap = await parser.parseEnabledPlugins();
-      const isEnabled = enabledMap.get(key);
-
-      installed = !!installedInfo;
-      enabled = enabledFromStore ?? isEnabled ?? true; // 优先使用 Store 传递的值
-      scope = scopeFromStore ?? installedInfo?.scope;
+      const status = await this.getPluginStatusFromFiles(pluginName, marketplace);
+      installed = status.installed;
+      enabled = enabledFromStore ?? status.enabled;
+      scope = scopeFromStore ?? status.scope;
     }
 
     return {
@@ -501,10 +500,9 @@ export class PluginDetailsService {
    */
   async fetchPluginStarsAsync(pluginName: string, marketplace: string): Promise<number | null> {
     try {
-      const { FileParser } = await import('./FileParser');
-      const parser = new FileParser();
+      const parser = await this.getFileParser();
       const marketplaces = await parser.parseMarketplaces();
-      const market = marketplaces.find(m => m.name === marketplace);
+      const market = marketplaces.find((m: any) => m.name === marketplace);
 
       if (!market || market.source.source !== 'github' || !market.source.repo) {
         return null;
@@ -515,10 +513,10 @@ export class PluginDetailsService {
         return null;
       }
       const stars = await this.fetchGitHubStars(repoInfo.owner, repoInfo.repo);
-      console.log(`[PluginDetailsService] Fetched stars for ${pluginName}: ${stars}`);
+      logger.debug(`获取 ${pluginName} 的 stars: ${stars}`);
       return stars;
     } catch (error) {
-      console.error(`[PluginDetailsService] Failed to fetch stars for ${pluginName}:`, error);
+      logger.error(`获取 ${pluginName} 的 stars 失败:`, error);
       return null;
     }
   }

@@ -7,7 +7,7 @@ import { PluginScope } from '../types';
 export interface MarketplaceInfo {
   name: string;
   source: {
-    source: 'github' | 'url';
+    source: 'github' | 'url' | 'directory' | 'git';
     repo?: string;
     url?: string;
   };

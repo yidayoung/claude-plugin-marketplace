@@ -5,6 +5,7 @@ import { PluginDataStore } from '../data/PluginDataStore';
 import { StoreEvent } from '../data/types';
 import { PluginDetailUpdateEvent, PluginStatusChangeEvent } from '../data/types';
 import { OpenFilePayload } from './messages/types';
+import { logger } from '../../shared/utils/logger';
 
 /**
  * 插件详情 Webview Panel 管理器
@@ -114,7 +115,7 @@ export class PluginDetailsPanel {
       this._dataStore.on(StoreEvent.PluginStatusChange, (event: PluginStatusChangeEvent) => {
         // 检查插件名称和市场名称是否匹配当前面板
         if (event.pluginName === this._pluginName && event.marketplace === this._marketplace) {
-          console.log(`[PluginDetailsPanel] Status changed for ${event.pluginName}, notifying webview`);
+          logger.debug(`插件 ${event.pluginName} 状态变更，通知 webview`);
           this.sendMessage({
             type: 'statusUpdate',
             payload: { change: event.change }
@@ -159,18 +160,16 @@ export class PluginDetailsPanel {
     this._marketplace = marketplace;
     this._isInstalled = isInstalled;
 
-    console.log(`[PluginDetailsPanel] 🔵 Loading details: ${pluginName} from ${marketplace}, installed: ${isInstalled}, forceRefresh: ${forceRefresh}`);
+    logger.debug(`加载插件详情: ${pluginName} 来自 ${marketplace}, 已安装: ${isInstalled}, 强制刷新: ${forceRefresh}`);
 
     try {
       // 使用 PluginDataStore 获取插件详情（统一的数据源）
       const detail = await this._dataStore.getPluginDetail(pluginName, marketplace, forceRefresh);
-      console.log(`[PluginDetailsPanel] ✅ Got detail with installed=${detail.installed}, enabled=${detail.enabled}`);
       this._panel.title = `插件详情: ${pluginName}`;
       this.sendMessage({
         type: 'pluginDetail',
         payload: { plugin: detail }
       });
-      console.log(`[PluginDetailsPanel] 📤 Sent pluginDetail message to webview`);
 
       // 延迟加载 stars：在后台异步获取，不阻塞主流程
       // 注意：stars 已经由 PluginDataStore 自动异步加载，这里不需要额外处理
@@ -197,7 +196,7 @@ export class PluginDetailsPanel {
           break;
         case 'refreshPluginDetail':
           // Webview 请求刷新插件详情（由 statusUpdate 事件触发）
-          console.log('[PluginDetailsPanel] Refreshing plugin detail after status change');
+          logger.debug('状态变更后刷新插件详情');
           await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled, true);
           break;
         case 'installPlugin':
@@ -262,22 +261,12 @@ export class PluginDetailsPanel {
           // 打开目录在系统文件管理器中
           const directoryPath = message.payload.directoryPath;
           const directoryUri = vscode.Uri.file(directoryPath);
-          // 根据操作系统使用不同的命令
-          switch (process.platform) {
-            case 'win32':
-              // Windows: 使用 explorer
-              await vscode.env.openExternal(directoryUri);
-              break;
-            case 'darwin':
-              // macOS: 使用 open
-              await vscode.env.openExternal(directoryUri);
-              break;
-            case 'linux':
-              // Linux: 使用 xdg-open
-              await vscode.env.openExternal(directoryUri);
-              break;
-            default:
-              vscode.window.showWarningMessage('不支持的操作系统');
+          // vscode.env.openExternal 在所有主流平台都支持
+          const supportedPlatforms = ['win32', 'darwin', 'linux'];
+          if (supportedPlatforms.includes(process.platform)) {
+            await vscode.env.openExternal(directoryUri);
+          } else {
+            vscode.window.showWarningMessage('不支持的操作系统');
           }
           break;
         case 'copyToClipboard':

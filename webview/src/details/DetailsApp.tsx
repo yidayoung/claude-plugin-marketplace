@@ -12,6 +12,12 @@ declare const vscode: {
 };
 
 // 本地类型定义
+export interface MarketplaceSource {
+  source: 'github' | 'url' | 'directory' | 'git';
+  repo?: string;
+  url?: string;
+}
+
 export interface PluginDetailData {
   name: string;
   description: string;
@@ -37,6 +43,7 @@ export interface PluginDetailData {
   license?: string;
   isRemoteSource?: boolean;
   localPath?: string;
+  marketplaceSource?: MarketplaceSource;
 }
 
 export interface SkillInfo {
@@ -101,26 +108,20 @@ const DetailsApp: React.FC = () => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const message = event.data;
-      console.log('[DetailsApp] Received message:', message.type);
       switch (message.type) {
         case 'pluginDetail':
-          console.log('[DetailsApp] 📦 Plugin detail data received:', message.payload.plugin);
-          console.log('[DetailsApp] 📦 Plugin installed status:', message.payload.plugin.installed);
           setPlugin(message.payload.plugin);
           setLoading(false);
           setError(null);
           messageReceivedRef.current = true; // 标记已收到消息
-          console.log('[DetailsApp] ✅ Plugin state updated');
           break;
         case 'starsUpdate':
-          console.log('[DetailsApp] Stars update received, requesting full refresh');
           // 星标数据变更时，请求完整重新拉取（而不是精细化更新）
           vscode.postMessage({
             type: 'refreshPluginDetail'
           });
           break;
         case 'statusUpdate':
-          console.log('[DetailsApp] Plugin status changed, requesting refresh');
           // 状态变更时，请求扩展侧重新发送完整的插件详情
           vscode.postMessage({
             type: 'refreshPluginDetail'
@@ -138,7 +139,6 @@ const DetailsApp: React.FC = () => {
 
     // 通知扩展侧 webview 已准备好接收数据
     if (!readyNotified) {
-      console.log('[DetailsApp] Sending ready message to extension');
       vscode.postMessage({ type: 'ready' });
       setReadyNotified(true);
     }
@@ -199,13 +199,6 @@ const DetailsApp: React.FC = () => {
     vscode.postMessage({
       type: 'openExternal',
       payload: { url }
-    });
-  };
-
-  const handleCopy = (text: string) => {
-    vscode.postMessage({
-      type: 'copyToClipboard',
-      payload: { text }
     });
   };
 
@@ -277,7 +270,6 @@ const DetailsApp: React.FC = () => {
         onEnable={handleEnable}
         onDisable={handleDisable}
         onOpenExternal={handleOpenExternal}
-        onCopy={handleCopy}
         onOpenDirectory={handleOpenDirectory}
       />
       <DetailContent plugin={plugin} onOpenFile={handleOpenFile} />

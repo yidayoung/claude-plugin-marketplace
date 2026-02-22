@@ -12,6 +12,7 @@ import {
 import { storeEvents } from './events';
 import { execClaudeCommand } from '../types';
 import { PluginDetailData } from '../webview/messages/types';
+import { logger } from '../../shared/utils/logger';
 
 /**
  * 插件数据存储
@@ -44,7 +45,7 @@ export class PluginDataStore {
       return;
     }
 
-    console.log('[PluginDataStore] Initializing...');
+    logger.info('[PluginDataStore] 初始化中...');
 
     // 并行加载市场列表和已安装插件
     const [marketplaces, installedPlugins] = await Promise.all([
@@ -70,7 +71,7 @@ export class PluginDataStore {
     this.fixInstalledPluginsMarketplace();
 
     this.isInitialized = true;
-    console.log('[PluginDataStore] Initialization complete');
+    logger.info('[PluginDataStore] 初始化完成');
   }
 
   /**
@@ -99,7 +100,7 @@ export class PluginDataStore {
         const newKey = `${name}@${newMarketplace}`;
         this.installedStatus.set(newKey, status);
         this.installedStatus.delete(oldKey);
-        console.log(`[PluginDataStore] Fixed plugin marketplace: ${oldKey} -> ${newKey}`);
+        logger.debug(`修复插件市场: ${oldKey} -> ${newKey}`);
       }
     }
 
@@ -185,17 +186,15 @@ export class PluginDataStore {
    */
   private updateInstalledStatus(pluginName: string, marketplace: string, status: Partial<InstalledStatus>): void {
     const key = `${pluginName}@${marketplace}`;
-    console.log(`[PluginDataStore] updateInstalledStatus: key=${key}, status=`, status);
-
     const plugins = this.pluginList.get(marketplace);
     if (!plugins) {
-      console.warn(`[PluginDataStore] Marketplace ${marketplace} not found when updating status for ${pluginName}`);
+      logger.warn(`市场 ${marketplace} 不存在，无法更新插件 ${pluginName} 的状态`);
       return;
     }
 
     const plugin = plugins.find(p => p.name === pluginName);
     if (!plugin) {
-      console.warn(`[PluginDataStore] Plugin ${pluginName} not found in marketplace ${marketplace}`);
+      logger.warn(`插件 ${pluginName} 在市场 ${marketplace} 中不存在`);
       return;
     }
 
@@ -211,9 +210,6 @@ export class PluginDataStore {
     // 清除详情缓存，确保下次获取时使用最新状态
     this.pluginDetails.delete(key);
     this.dataLoader.clearPluginDetailCache(pluginName, marketplace);
-
-    console.log(`[PluginDataStore] ✅ Updated installedStatus Map: key=${key}, newStatus=`, this.installedStatus.get(key));
-    console.log(`[PluginDataStore] ✅ Updated pluginList: ${pluginName}.installed=${plugin.installed}`);
   }
 
   /**
@@ -261,8 +257,6 @@ export class PluginDataStore {
       effectiveMarketplace = marketplace || this.findPluginMarketplace(pluginName) || '';
     }
 
-    console.log(`[PluginDataStore] Executing: ${commands[operation]}`);
-
     // 获取工作区路径，确保 CLI 在正确的工作目录下执行
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
@@ -270,12 +264,10 @@ export class PluginDataStore {
       cwd: workspacePath
     });
 
-    console.log(`[PluginDataStore] Command result: status=${result.status}, error=${result.error}, data=`, result.data);
-
     // 检查命令执行结果
     if (result.status !== 'success') {
       const errorMsg = result.error || `Failed to ${operation} plugin`;
-      console.error(`[PluginDataStore] ${operation} failed:`, errorMsg);
+      logger.error(`${operation} 失败:`, errorMsg);
       throw new Error(errorMsg);
     }
 
@@ -338,7 +330,7 @@ export class PluginDataStore {
   debugPluginStatus(pluginName: string, marketplace?: string): void {
     const effectiveMarketplace = marketplace || this.findPluginMarketplace(pluginName);
     if (!effectiveMarketplace) {
-      console.log(`[PluginDataStore] Debug: Plugin ${pluginName} not found in any marketplace`);
+      logger.debug(`插件 ${pluginName} 在任何市场中都未找到`);
       return;
     }
 
@@ -346,9 +338,9 @@ export class PluginDataStore {
     const status = this.installedStatus.get(key);
     const plugin = this.pluginList.get(effectiveMarketplace)?.find(p => p.name === pluginName);
 
-    console.log(`[PluginDataStore] Debug: Plugin ${pluginName}@${effectiveMarketplace}`);
-    console.log(`  - installedStatus:`, status);
-    console.log(`  - pluginList:`, plugin ? { installed: plugin.installed, enabled: plugin.enabled } : 'not found');
+    logger.debug(`插件状态: ${pluginName}@${effectiveMarketplace}`);
+    logger.debug('  - installedStatus:', status);
+    logger.debug('  - pluginList:', plugin ? { installed: plugin.installed, enabled: plugin.enabled } : 'not found');
   }
 
   /**
@@ -400,8 +392,6 @@ export class PluginDataStore {
     const status = this.installedStatus.get(key);
     const isInstalled = status?.installed ?? false;
 
-    console.log(`[PluginDataStore] fetchPluginDetail: key=${key}, status=`, status, `isInstalled=${isInstalled}`);
-
     // 从 Store 传递状态给 PluginDetailsService，确保使用单一数据源
     const data = await this.dataLoader.getPluginDetail(
       pluginName,
@@ -411,7 +401,17 @@ export class PluginDataStore {
       status?.scope
     );
 
-    console.log(`[PluginDataStore] fetchPluginDetail: dataLoader returned installed=${data.installed}`);
+    // 获取市场源信息
+    const marketplaceInfo = this.marketplaces.get(marketplace);
+
+    // 添加市场源信息到详情数据
+    if (marketplaceInfo) {
+      data.marketplaceSource = {
+        source: marketplaceInfo.source.source as 'github' | 'url' | 'directory' | 'git',
+        repo: marketplaceInfo.source.repo,
+        url: marketplaceInfo.source.url,
+      };
+    }
 
     // 更新缓存
     this.pluginDetails.set(key, {
@@ -460,7 +460,7 @@ export class PluginDataStore {
         }
       })
       .catch((err) => {
-        console.error(`[PluginDataStore] Failed to fetch stars for ${pluginName}:`, err);
+        logger.error(`获取 ${pluginName} 的 stars 失败:`, err);
       });
   }
 

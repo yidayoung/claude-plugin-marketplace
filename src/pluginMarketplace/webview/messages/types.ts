@@ -303,6 +303,12 @@ export interface PluginDetailData extends PluginData {
   isRemoteSource?: boolean;
   // 本地插件路径（用于打开目录）
   localPath?: string;
+  // 市场源信息
+  marketplaceSource?: {
+    source: 'github' | 'url' | 'directory' | 'git';
+    repo?: string;
+    url?: string;
+  };
 }
 
 /**
