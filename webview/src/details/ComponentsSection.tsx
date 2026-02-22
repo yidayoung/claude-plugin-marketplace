@@ -67,7 +67,7 @@ const ComponentsSection: React.FC<ComponentsSectionProps> = ({ plugin, onOpenFil
       return (
         <Space direction="vertical" size={12} style={{
           padding: 16,
-          background: 'var(--vscode-editor-background)',
+          background: 'var(--vscode-sideBar-background)',
           borderRadius: 8,
           border: '1px solid var(--vscode-panel-border)',
           width: '100%'
@@ -103,7 +103,7 @@ const ComponentsSection: React.FC<ComponentsSectionProps> = ({ plugin, onOpenFil
   return (
     <Space orientation="vertical" size={12} style={{
       padding: 16,
-      background: 'var(--vscode-editor-background)',
+      background: 'var(--vscode-sideBar-background)',
       borderRadius: 8,
       border: '1px solid var(--vscode-panel-border)',
       width: '100%'
