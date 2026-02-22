@@ -1,7 +1,7 @@
 // vscode-extension/webview/src/details/DetailHeader.tsx
 
 import React from 'react';
-import { Space, Tag, Button, Dropdown, Tooltip, Typography, Divider, Flex, Switch } from 'antd';
+import { Space, Tag, Button, Dropdown, Tooltip, Typography, Divider, Flex, Switch, Modal } from 'antd';
 import {
   DeleteOutlined,
   DownloadOutlined,
@@ -50,6 +50,18 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
   const isDisabled = plugin.installed && plugin.enabled === false;
   const scopeInfo = plugin.scope ? scopeConfig[plugin.scope] : null;
 
+  const handleUninstallWithConfirm = () => {
+    Modal.confirm({
+      title: '确认卸载',
+      content: `确定要卸载插件 "${plugin.name}" 吗？`,
+      okText: '卸载',
+      okType: 'danger',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: onUninstall,
+    });
+  };
+
   const installMenuItems: MenuProps['items'] = [
     {
       key: 'user',
@@ -74,18 +86,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
       <Flex justify="space-between" align="flex-start" gap={16} style={{ marginBottom: 12 }}>
         <Space direction="vertical" size={4} style={{ flex: 1 }}>
           <Space size="middle">
-            <Title
-              level={3}
-              style={{
-                margin: 0,
-                cursor: plugin.localPath ? 'pointer' : 'default'
-              }}
-              onClick={() => {
-                if (plugin.localPath && onOpenDirectory) {
-                  onOpenDirectory(plugin.localPath);
-                }
-              }}
-            >
+            <Title level={3} style={{ margin: 0 }}>
               {plugin.name}
             </Title>
             {plugin.localPath && onOpenDirectory && (
@@ -178,7 +179,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
                   type="text"
                   size="small"
                   icon={<DeleteOutlined />}
-                  onClick={onUninstall}
+                  onClick={handleUninstallWithConfirm}
                 />
               </Tooltip>
             </Space>
