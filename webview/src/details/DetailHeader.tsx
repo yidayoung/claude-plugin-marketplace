@@ -11,8 +11,6 @@ import {
   GithubOutlined,
   LinkOutlined,
   CopyOutlined,
-  CheckCircleFilled,
-  StopOutlined,
   StarFilled
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
@@ -101,16 +99,6 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
               </Tooltip>
             )}
             <Tag color="blue">v{plugin.version}</Tag>
-            {plugin.installed && !isDisabled && (
-              <Tooltip title="已启用">
-                <CheckCircleFilled style={{ color: '#52c41a', fontSize: 16 }} />
-              </Tooltip>
-            )}
-            {isDisabled && (
-              <Tooltip title="已禁用">
-                <StopOutlined style={{ fontSize: 16 }} />
-              </Tooltip>
-            )}
           </Space>
           <Text type="secondary" style={{ fontSize: 13 }}>
             {plugin.author && `作者: ${plugin.author} · `}
