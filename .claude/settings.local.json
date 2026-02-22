@@ -13,7 +13,11 @@
       "Bash(find:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(claude plugin list:*)"
+      "Bash(claude plugin list:*)",
+      "Bash(cmd.exe /c \"C:\\\\Users\\\\Administrator\\\\.local\\\\bin\\\\claude.exe plugin list\")",
+      "Bash(powershell.exe -Command \"claude plugin list\")",
+      "Bash(claude help:*)",
+      "Bash(npm install:*)"
     ]
   },
   "enabledPlugins": {

@@ -25,12 +25,8 @@ export class DataLoader {
    * 重要：需要在当前工作目录下执行，才能正确识别 local 作用域的插件
    */
   async loadInstalledPlugins(): Promise<InstalledPlugin[]> {
-    console.log('[DataLoader] Loading installed plugins...');
-
     // 获取当前工作目录，确保能正确识别 local 插件
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    console.log('[DataLoader] Workspace path:', workspacePath);
-    console.log('[DataLoader] Using cwd:', workspacePath || 'undefined (will use default)');
 
     const result = await execClaudeCommand('plugin list --json', {
       cwd: workspacePath // 在当前工作目录下执行
@@ -68,8 +64,7 @@ export class DataLoader {
           installPath: plugin.installPath
         });
 
-        // 调试日志：记录解析的插件状态
-        console.log(`[DataLoader] Parsed plugin: ${name}@${marketplace}, enabled: ${plugin.enabled}, scope: ${plugin.scope}`);
+        console.log(`[DataLoader] Loaded plugin: ${name}@${marketplace || ''}, enabled=${plugin.enabled}, default=${plugin.enabled ?? true}`);
       }
     } else {
       // 或者是对象格式 { plugins: { "name@marketplace": [entries] } }
@@ -118,13 +113,10 @@ export class DataLoader {
       const data = JSON.parse(content);
 
       // known_marketplaces.json 格式: { [name]: { source, installLocation, lastUpdated } }
-      const marketplaces = Object.entries(data).map(([name, info]: [string, any]) => ({
+      return Object.entries(data).map(([name, info]: [string, any]) => ({
         name,
         source: info.source,
       }));
-
-      console.log('[DataLoader] Loaded marketplaces:', marketplaces.map(m => m.name));
-      return marketplaces;
     } catch (error) {
       console.error('[DataLoader] Failed to load known_marketplaces.json:', error);
       return [];
@@ -143,13 +135,9 @@ export class DataLoader {
     const marketplacePath = path.join(homeDir, '.claude', 'plugins', 'marketplaces', marketplace.name);
     const marketplaceJsonPath = path.join(marketplacePath, '.claude-plugin', 'marketplace.json');
 
-    console.log(`[DataLoader] Loading plugins from ${marketplace.name} at ${marketplacePath}`);
-
     try {
       const content = await fs.readFile(marketplaceJsonPath, 'utf-8');
       const config = JSON.parse(content);
-
-      console.log(`[DataLoader] Loading ${config.plugins?.length || 0} plugins from ${marketplace.name}`);
 
       return (config.plugins || []).map((p: any) => ({
         name: p.name,
@@ -201,5 +189,13 @@ export class DataLoader {
       // 忽略错误
     }
     return 0;
+  }
+
+  /**
+   * 清除插件详情缓存
+   * 用于状态变更时确保返回最新数据
+   */
+  clearPluginDetailCache(pluginName: string, marketplace?: string): void {
+    this.pluginDetailsService.clearCache(pluginName, marketplace);
   }
 }

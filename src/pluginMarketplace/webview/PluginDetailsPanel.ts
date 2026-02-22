@@ -100,8 +100,9 @@ export class PluginDetailsPanel {
     // 订阅状态变更事件
     this._disposables.push(
       this._dataStore.on(StoreEvent.PluginStatusChange, (event: PluginStatusChangeEvent) => {
-        // 同时检查插件名称和市场名称，确保匹配
+        // 检查插件名称和市场名称是否匹配当前面板
         if (event.pluginName === this._pluginName && event.marketplace === this._marketplace) {
+          console.log(`[PluginDetailsPanel] Status changed for ${event.pluginName}, notifying webview`);
           this.sendMessage({
             type: 'statusUpdate',
             payload: { change: event.change }
@@ -139,24 +140,25 @@ export class PluginDetailsPanel {
   public async loadPluginDetail(
     pluginName: string,
     marketplace: string,
-    isInstalled: boolean
+    isInstalled: boolean,
+    forceRefresh = false
   ): Promise<void> {
     this._pluginName = pluginName;
     this._marketplace = marketplace;
     this._isInstalled = isInstalled;
 
-    console.log(`[PluginDetailsPanel] Loading details: ${pluginName} from ${marketplace}, installed: ${isInstalled}`);
+    console.log(`[PluginDetailsPanel] 🔵 Loading details: ${pluginName} from ${marketplace}, installed: ${isInstalled}, forceRefresh: ${forceRefresh}`);
 
     try {
       // 使用 PluginDataStore 获取插件详情（统一的数据源）
-      const detail = await this._dataStore.getPluginDetail(pluginName, marketplace);
-      console.log(`[PluginDetailsPanel] Got detail:`, detail);
+      const detail = await this._dataStore.getPluginDetail(pluginName, marketplace, forceRefresh);
+      console.log(`[PluginDetailsPanel] ✅ Got detail with installed=${detail.installed}, enabled=${detail.enabled}`);
       this._panel.title = `插件详情: ${pluginName}`;
       this.sendMessage({
         type: 'pluginDetail',
         payload: { plugin: detail }
       });
-      console.log(`[PluginDetailsPanel] Sent pluginDetail message`);
+      console.log(`[PluginDetailsPanel] 📤 Sent pluginDetail message to webview`);
 
       // 延迟加载 stars：在后台异步获取，不阻塞主流程
       // 注意：stars 已经由 PluginDataStore 自动异步加载，这里不需要额外处理
@@ -178,9 +180,13 @@ export class PluginDetailsPanel {
       switch (message.type) {
         case 'ready':
           // Webview 已准备好，现在加载插件详情
-          console.log('[PluginDetailsPanel] Webview is ready, loading plugin details');
           this._webviewReady = true;
           await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled);
+          break;
+        case 'refreshPluginDetail':
+          // Webview 请求刷新插件详情（由 statusUpdate 事件触发）
+          console.log('[PluginDetailsPanel] Refreshing plugin detail after status change');
+          await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled, true);
           break;
         case 'installPlugin':
           // 使用 PluginDataStore 统一管理
@@ -188,8 +194,8 @@ export class PluginDetailsPanel {
             const { pluginName, marketplace, scope } = message.payload;
             await this._dataStore.installPlugin(pluginName, marketplace, scope as 'user' | 'project');
             vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 安装成功`);
-            // 刷新详情面板
-            await this.loadPluginDetail(this._pluginName, this._marketplace, true);
+            // 强制刷新详情面板（绕过缓存）
+            await this.loadPluginDetail(this._pluginName, this._marketplace, true, true);
           } catch (error: any) {
             vscode.window.showErrorMessage(`❌ 安装失败: ${error.message || '未知错误'}`);
           }
@@ -200,8 +206,8 @@ export class PluginDetailsPanel {
             const { pluginName } = message.payload;
             await this._dataStore.uninstallPlugin(pluginName);
             vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已卸载`);
-            // 刷新详情面板
-            await this.loadPluginDetail(this._pluginName, this._marketplace, false);
+            // 事件系统会自动触发 UI 更新，但为了确保刷新，手动刷新一次
+            await this.loadPluginDetail(this._pluginName, this._marketplace, false, true);
           } catch (error: any) {
             vscode.window.showErrorMessage(`❌ 卸载失败: ${error.message || '未知错误'}`);
           }

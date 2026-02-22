@@ -56,7 +56,6 @@ export class PluginDataStore {
     marketplaces.forEach(m => this.marketplaces.set(m.name, m));
     installedPlugins.forEach(p => {
       const key = this.pluginKey(p.name, p.marketplace || '');
-      console.log('[PluginDataStore] Storing installed status:', key, 'enabled:', p.enabled, 'scope:', p.scope);
       this.installedStatus.set(key, {
         installed: true,
         enabled: p.enabled ?? true,
@@ -67,8 +66,47 @@ export class PluginDataStore {
     await this.loadAllPluginLists();
     this.syncInstalledStatus();
 
+    // 修复：对于没有正确 marketplace 的已安装插件，从 pluginList 中查找并更新
+    this.fixInstalledPluginsMarketplace();
+
     this.isInitialized = true;
     console.log('[PluginDataStore] Initialization complete');
+  }
+
+  /**
+   * 修复已安装插件的 marketplace 字段
+   * 对于 CLI 返回的 marketplace 为空的插件，从 pluginList 中查找正确的市场名称
+   */
+  private fixInstalledPluginsMarketplace(): void {
+    const toFix: Array<{ name: string; oldKey: string; newMarketplace: string }> = [];
+
+    // 查找所有需要修复的插件
+    for (const [key, status] of this.installedStatus.entries()) {
+      if (key.endsWith('@')) {
+        // key 格式为 "pluginName@"，marketplace 为空
+        const pluginName = key.slice(0, -1); // 移除末尾的 '@'
+        const marketplace = this.findPluginMarketplace(pluginName);
+        if (marketplace) {
+          toFix.push({ name: pluginName, oldKey: key, newMarketplace: marketplace });
+        }
+      }
+    }
+
+    // 更新 Map
+    for (const { name, oldKey, newMarketplace } of toFix) {
+      const status = this.installedStatus.get(oldKey);
+      if (status) {
+        const newKey = `${name}@${newMarketplace}`;
+        this.installedStatus.set(newKey, status);
+        this.installedStatus.delete(oldKey);
+        console.log(`[PluginDataStore] Fixed plugin marketplace: ${oldKey} -> ${newKey}`);
+      }
+    }
+
+    if (toFix.length > 0) {
+      // 重新同步状态
+      this.syncInstalledStatus();
+    }
   }
 
   /**
@@ -98,19 +136,14 @@ export class PluginDataStore {
    * 同步插件列表中的安装状态
    */
   private syncInstalledStatus(): void {
-    let matchedCount = 0;
     for (const [marketplace, plugins] of this.pluginList.entries()) {
       for (const plugin of plugins) {
         const key = `${plugin.name}@${marketplace}`;
         const status = this.installedStatus.get(key);
         if (status) {
-          console.log(`[PluginDataStore] Syncing ${key}: enabled=${status.enabled}, scope=${status.scope}`);
           plugin.installed = status.installed;
           plugin.enabled = status.enabled;
           plugin.scope = status.scope;
-          matchedCount++;
-        } else {
-          console.log(`[PluginDataStore] No status found for ${key}`);
         }
       }
     }
@@ -152,6 +185,8 @@ export class PluginDataStore {
    */
   private updateInstalledStatus(pluginName: string, marketplace: string, status: Partial<InstalledStatus>): void {
     const key = `${pluginName}@${marketplace}`;
+    console.log(`[PluginDataStore] updateInstalledStatus: key=${key}, status=`, status);
+
     const plugins = this.pluginList.get(marketplace);
     if (!plugins) {
       console.warn(`[PluginDataStore] Marketplace ${marketplace} not found when updating status for ${pluginName}`);
@@ -173,7 +208,12 @@ export class PluginDataStore {
     plugin.enabled = status.enabled ?? current.enabled;
     plugin.scope = status.scope ?? current.scope;
 
-    console.log(`[PluginDataStore] Updated status for ${pluginName}@${marketplace}:`, { ...current, ...status });
+    // 清除详情缓存，确保下次获取时使用最新状态
+    this.pluginDetails.delete(key);
+    this.dataLoader.clearPluginDetailCache(pluginName, marketplace);
+
+    console.log(`[PluginDataStore] ✅ Updated installedStatus Map: key=${key}, newStatus=`, this.installedStatus.get(key));
+    console.log(`[PluginDataStore] ✅ Updated pluginList: ${pluginName}.installed=${plugin.installed}`);
   }
 
   /**
@@ -193,7 +233,9 @@ export class PluginDataStore {
     scope?: 'user' | 'project' | 'local'
   ): Promise<void> {
     const commands = {
-      install: `plugin install "${pluginName}@${marketplace}" --${scope || 'user'}`,
+      install: scope
+        ? `plugin install "${pluginName}@${marketplace}" --scope ${scope}`
+        : `plugin install "${pluginName}@${marketplace}"`,
       uninstall: `plugin uninstall "${pluginName}"`,
       enable: `plugin enable "${pluginName}@${marketplace}"`,
       disable: `plugin disable "${pluginName}@${marketplace}"`
@@ -213,15 +255,34 @@ export class PluginDataStore {
       disable: 'disabled' as const
     };
 
-    await execClaudeCommand(commands[operation]);
-    this.updateInstalledStatus(pluginName, marketplace, statusChanges[operation]);
-
-    // 对于 uninstall，可能需要查找市场名称（因为 uninstall 命令不需要 marketplace 参数）
+    // 对于 uninstall，需要先查找市场名称（因为 uninstall 命令不需要 marketplace 参数）
     let effectiveMarketplace = marketplace;
     if (operation === 'uninstall') {
       effectiveMarketplace = marketplace || this.findPluginMarketplace(pluginName) || '';
     }
 
+    console.log(`[PluginDataStore] Executing: ${commands[operation]}`);
+
+    // 获取工作区路径，确保 CLI 在正确的工作目录下执行
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+    const result = await execClaudeCommand(commands[operation], {
+      cwd: workspacePath
+    });
+
+    console.log(`[PluginDataStore] Command result: status=${result.status}, error=${result.error}, data=`, result.data);
+
+    // 检查命令执行结果
+    if (result.status !== 'success') {
+      const errorMsg = result.error || `Failed to ${operation} plugin`;
+      console.error(`[PluginDataStore] ${operation} failed:`, errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    // 命令成功时更新状态
+    this.updateInstalledStatus(pluginName, effectiveMarketplace, statusChanges[operation]);
+
+    // 发射状态变更事件
     if (effectiveMarketplace) {
       storeEvents.emitPluginStatusChange({
         pluginName,
@@ -272,6 +333,25 @@ export class PluginDataStore {
   }
 
   /**
+   * 调试方法：打印插件状态
+   */
+  debugPluginStatus(pluginName: string, marketplace?: string): void {
+    const effectiveMarketplace = marketplace || this.findPluginMarketplace(pluginName);
+    if (!effectiveMarketplace) {
+      console.log(`[PluginDataStore] Debug: Plugin ${pluginName} not found in any marketplace`);
+      return;
+    }
+
+    const key = `${pluginName}@${effectiveMarketplace}`;
+    const status = this.installedStatus.get(key);
+    const plugin = this.pluginList.get(effectiveMarketplace)?.find(p => p.name === pluginName);
+
+    console.log(`[PluginDataStore] Debug: Plugin ${pluginName}@${effectiveMarketplace}`);
+    console.log(`  - installedStatus:`, status);
+    console.log(`  - pluginList:`, plugin ? { installed: plugin.installed, enabled: plugin.enabled } : 'not found');
+  }
+
+  /**
    * 订阅事件
    */
   on(event: StoreEvent, callback: (...args: any[]) => void): vscode.Disposable {
@@ -281,13 +361,15 @@ export class PluginDataStore {
   /**
    * 获取插件详情（带缓存和请求去重）
    */
-  async getPluginDetail(pluginName: string, marketplace: string): Promise<PluginDetailData> {
+  async getPluginDetail(pluginName: string, marketplace: string, forceRefresh = false): Promise<PluginDetailData> {
     const key = `${pluginName}@${marketplace}`;
 
-    // 检查缓存
-    const cached = this.pluginDetails.get(key);
-    if (cached && Date.now() - cached.timestamp < this.DETAIL_CACHE_TTL) {
-      return cached.data;
+    // 检查缓存（除非强制刷新）
+    if (!forceRefresh) {
+      const cached = this.pluginDetails.get(key);
+      if (cached && Date.now() - cached.timestamp < this.DETAIL_CACHE_TTL) {
+        return cached.data;
+      }
     }
 
     // 检查是否有进行中的请求
@@ -318,6 +400,8 @@ export class PluginDataStore {
     const status = this.installedStatus.get(key);
     const isInstalled = status?.installed ?? false;
 
+    console.log(`[PluginDataStore] fetchPluginDetail: key=${key}, status=`, status, `isInstalled=${isInstalled}`);
+
     // 从 Store 传递状态给 PluginDetailsService，确保使用单一数据源
     const data = await this.dataLoader.getPluginDetail(
       pluginName,
@@ -326,6 +410,8 @@ export class PluginDataStore {
       status?.enabled,
       status?.scope
     );
+
+    console.log(`[PluginDataStore] fetchPluginDetail: dataLoader returned installed=${data.installed}`);
 
     // 更新缓存
     this.pluginDetails.set(key, {

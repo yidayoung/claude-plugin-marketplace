@@ -38,6 +38,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('claudePluginMarketplace.getDataStore', () => dataStore)
   );
 
+  // 调试命令：打印插件状态
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudePluginMarketplace.debugPluginStatus', (pluginName: string, marketplace?: string) => {
+      if (dataStore) {
+        (dataStore as any).debugPluginStatus(pluginName, marketplace);
+      }
+    })
+  );
+
   // 检查 Claude Code 是否安装
   dataStore.checkClaudeInstalled().then((installed: boolean) => {
     if (!installed) {

@@ -104,46 +104,26 @@ const DetailsApp: React.FC = () => {
       console.log('[DetailsApp] Received message:', message.type);
       switch (message.type) {
         case 'pluginDetail':
-          console.log('[DetailsApp] Plugin detail data:', message.payload);
+          console.log('[DetailsApp] 📦 Plugin detail data received:', message.payload.plugin);
+          console.log('[DetailsApp] 📦 Plugin installed status:', message.payload.plugin.installed);
           setPlugin(message.payload.plugin);
           setLoading(false);
           setError(null);
           messageReceivedRef.current = true; // 标记已收到消息
+          console.log('[DetailsApp] ✅ Plugin state updated');
           break;
         case 'starsUpdate':
-          console.log('[DetailsApp] Stars update received:', message.payload);
-          // 更新现有插件的 stars（使用函数式更新避免依赖 plugin）
-          setPlugin(prev => {
-            if (prev && prev.name === message.payload.pluginName) {
-              return {
-                ...prev,
-                repository: prev.repository ? {
-                  ...prev.repository,
-                  stars: message.payload.stars
-                } : undefined
-              };
-            }
-            return prev;
+          console.log('[DetailsApp] Stars update received, requesting full refresh');
+          // 星标数据变更时，请求完整重新拉取（而不是精细化更新）
+          vscode.postMessage({
+            type: 'refreshPluginDetail'
           });
           break;
         case 'statusUpdate':
-          console.log('[DetailsApp] Status update received:', message.payload);
-          // 根据变更类型更新插件状态
-          setPlugin(prev => {
-            if (!prev) return prev;
-            const change = message.payload.change;
-            switch (change) {
-              case 'enabled':
-                return { ...prev, enabled: true };
-              case 'disabled':
-                return { ...prev, enabled: false };
-              case 'installed':
-                return { ...prev, installed: true };
-              case 'uninstalled':
-                return { ...prev, installed: false };
-              default:
-                return prev;
-            }
+          console.log('[DetailsApp] Plugin status changed, requesting refresh');
+          // 状态变更时，请求扩展侧重新发送完整的插件详情
+          vscode.postMessage({
+            type: 'refreshPluginDetail'
           });
           break;
         case 'error':

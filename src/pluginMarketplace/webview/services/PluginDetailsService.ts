@@ -71,11 +71,16 @@ export class PluginDetailsService {
       if (enabledFromStore !== undefined || scopeFromStore !== undefined) {
         return {
           ...cached.data,
+          installed: isInstalled, // ✅ 同时更新 installed 字段
           enabled: enabledFromStore ?? cached.data.enabled,
           scope: scopeFromStore ?? cached.data.scope,
         };
       }
-      return cached.data;
+      // 即使没有启用/作用域更新，也要确保 installed 字段正确
+      return {
+        ...cached.data,
+        installed: isInstalled,
+      };
     }
 
     // 获取数据，传递来自 Store 的状态

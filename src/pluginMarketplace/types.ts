@@ -88,6 +88,17 @@ export async function execClaudeCommand(
       }
     );
 
+    // 记录命令执行结果，方便调试
+    console.log(`[execClaudeCommand] Command: claude ${command}`);
+    console.log(`[execClaudeCommand] stdout length: ${stdout?.length || 0}`);
+    console.log(`[execClaudeCommand] stderr: ${stderr || '(empty)'}`);
+
+    // 检查 stderr 是否包含错误信息
+    if (stderr && stderr.trim() && !stderr.includes('warning') && !stderr.includes('deprecated')) {
+      // 如果 stderr 有内容且不是警告，可能是错误
+      console.warn(`[execClaudeCommand] stderr detected:`, stderr);
+    }
+
     // 解析 JSON 输出
     if (command.includes('--json')) {
       try {

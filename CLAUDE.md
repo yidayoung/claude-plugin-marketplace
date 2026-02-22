@@ -167,7 +167,10 @@ await execClaudeCommand('plugin marketplace add <source>');
    context.subscriptions.push(disposable); // deactivate时自动清理
    ```
 
-3. **Always rebuild webview** after editing `webview/src/` files
+3. **Development with Hot Reload**:
+   - 热更新模式（F5 → "🔴 开发扩展 (Webview 热更新)"）会自动监听文件变化
+   - 修改 `webview/src/` 文件后，Vite 开发服务器会自动热更新，无需手动 build
+   - 仅在生产构建时需要手动执行 `npm run build-webview`
 
 4. **Extension entry point**: [extension.ts](src/extension.ts)
 
@@ -288,9 +291,10 @@ This project uses TypeScript, React, Ant Design, and Jest. Recommended Claude Co
 }
 ```
 
-#### Build webview on React changes
-**Why**: Automatically rebuild webview after editing React components
+#### Build webview on React changes (仅生产模式)
+**Why**: 在没有启动热更新服务器时，自动构建 webview
 **Where**: `.claude/settings.json`
+**注意**: 如果使用热更新模式（`npm run dev-webview`），不需要此 hook
 ```json
 {
   "hooks": {
