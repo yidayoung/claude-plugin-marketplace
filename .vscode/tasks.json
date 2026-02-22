@@ -9,25 +9,41 @@
       "presentation": {
         "reveal": "never"
       },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "label": "vscode: watch"
+      "label": "vscode: tsc"
     },
     {
-      "label": "vscode: watch with webview",
+      "type": "shell",
+      "command": "npx tsc-alias -w -p tsconfig.json",
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "never"
+      },
+      "label": "vscode: tsc-alias"
+    },
+    {
+      "label": "vscode: watch",
       "dependsOrder": "parallel",
       "dependsOn": [
-        "vscode: build-webview",
-        "vscode: watch"
+        "vscode: tsc",
+        "vscode: tsc-alias"
       ],
       "problemMatcher": [],
       "group": {
         "kind": "build",
-        "isDefault": false
+        "isDefault": true
+      }
+    },
+    {
+      "type": "npm",
+      "script": "dev-webview",
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
       },
-      "detail": "并行任务：监听 Extension 代码变化 + 初始构建 Webview"
+      "label": "webview: dev server"
     },
     {
       "label": "vscode: watch with webview dev server",
@@ -36,13 +52,7 @@
         "webview: dev server",
         "vscode: watch"
       ],
-      "problemMatcher": [],
-      "isBackground": true,
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "detail": "并行任务：监听 Extension 代码 + Webview Vite 热更新服务器"
+      "problemMatcher": []
     },
     {
       "type": "npm",
@@ -51,7 +61,6 @@
       "presentation": {
         "reveal": "silent"
       },
-      "group": "build",
       "label": "vscode: compile"
     },
     {
@@ -61,7 +70,6 @@
       "presentation": {
         "reveal": "silent"
       },
-      "group": "build",
       "label": "vscode: build-webview"
     },
     {
@@ -71,21 +79,17 @@
         "vscode: compile",
         "vscode: build-webview"
       ],
-      "problemMatcher": [],
-      "group": "build"
+      "problemMatcher": []
     },
     {
-      "type": "npm",
-      "script": "dev-webview",
+      "label": "🛑 停止开发服务器",
+      "type": "shell",
+      "command": "npx --yes kill-port --port 5173",
       "problemMatcher": [],
-      "isBackground": true,
       "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "webview"
+        "reveal": "always"
       },
-      "label": "webview: dev server",
-      "detail": "启动 Vite 开发服务器（热更新）"
+      "detail": "手动停止 Vite 开发服务器 (端口 5173)"
     }
   ]
 }

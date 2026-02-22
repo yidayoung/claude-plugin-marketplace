@@ -17,7 +17,9 @@
       "Bash(cmd.exe /c \"C:\\\\Users\\\\Administrator\\\\.local\\\\bin\\\\claude.exe plugin list\")",
       "Bash(powershell.exe -Command \"claude plugin list\")",
       "Bash(claude help:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(timeout 8 npm run dev-webview:*)",
+      "Bash(npx tsc-alias:*)"
     ]
   },
   "enabledPlugins": {

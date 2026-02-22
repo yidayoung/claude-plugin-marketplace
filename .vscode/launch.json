@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "🔴 开发扩展 (Webview 热更新)",
+      "name": "🔥 开发模式 (双端热更新 + 断点)",
       "type": "extensionHost",
       "request": "launch",
       "args": [
@@ -11,36 +11,21 @@
       "outFiles": [
         "${workspaceFolder}/out/**/*.js"
       ],
-      "preLaunchTask": "vscode: watch with webview",
+      "preLaunchTask": "vscode: watch with webview dev server",
       "resolveSourceMapLocations": [
         "${workspaceFolder}/out/**/*.js",
+        "${workspaceFolder}/webview/src/**",
         "${workspaceFolder}/node_modules/**/*.js"
-      ]
-    },
-    {
-      "name": "🔧 调试 Webview (自动附加)",
-      "type": "chrome",
-      "request": "attach",
-      "port": 9222,
-      "webRoot": "${workspaceFolder}/webview",
-      "timeout": 30000,
-      "presentation": {
-        "hidden": false,
-        "group": "webview"
+      ],
+      "sourceMaps": true,
+      "smartStep": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "env": {
+        "VITE_DEV_SERVER": "true",
+        "NODE_ENV": "development"
       }
-    },
-    {
-      "name": "🔴 复合调试 (扩展 + Webview 自动调试)",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}",
-        "--inspect-extensions"
-      ],
-      "outFiles": [
-        "${workspaceFolder}/out/**/*.js"
-      ],
-      "preLaunchTask": "vscode: watch with webview"
     },
     {
       "name": "✅ 生产模式 (完整构建)",
@@ -50,42 +35,14 @@
         "--extensionDevelopmentPath=${workspaceFolder}"
       ],
       "outFiles": [
-        "${workspaceFolder}/out/**/*.js"
+        "${workspaceFolder}/out/**/*.js",
+        "${workspaceFolder}/webview/dist/**/*.js"
       ],
-      "preLaunchTask": "vscode: 全部构建"
-    },
-    {
-      "name": "🧪 运行当前测试文件",
-      "type": "node",
-      "request": "launch",
-      "program": "${workspaceFolder}/node_modules/.bin/jest",
-      "args": [
-        "${fileBasenameNoExtension}",
-        "--config",
-        "jest.config.js",
-        "--no-coverage",
-        "--runInBand"
-      ],
-      "console": "integratedTerminal",
-      "windows": {
-        "program": "${workspaceFolder}/node_modules/jest/bin/jest"
-      },
-      "internalConsoleOptions": "neverOpen"
-    },
-    {
-      "name": "🧪 调试所有测试",
-      "type": "node",
-      "request": "launch",
-      "program": "${workspaceFolder}/node_modules/.bin/jest",
-      "args": [
-        "--runInBand",
-        "--no-cache"
-      ],
-      "console": "integratedTerminal",
-      "windows": {
-        "program": "${workspaceFolder}/node_modules/jest/bin/jest"
-      },
-      "internalConsoleOptions": "neverOpen"
+      "preLaunchTask": "vscode: 全部构建",
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/out/**/*.js",
+        "${workspaceFolder}/webview/dist/**/*.js"
+      ]
     }
   ]
 }

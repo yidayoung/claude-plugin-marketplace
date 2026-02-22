@@ -17,6 +17,7 @@ export class PluginDetailsPanel {
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private readonly _dataStore: PluginDataStore;
+  private readonly _isDevelopment: boolean;
   private _disposables: vscode.Disposable[] = [];
   private _webviewReady = false; // 跟踪 webview 是否已准备好
 
@@ -43,6 +44,9 @@ export class PluginDetailsPanel {
       return;
     }
 
+    // 检测是否为开发环境
+    const isDevelopment = process.env.VITE_DEV_SERVER === 'true' || process.env.NODE_ENV === 'development';
+
     // 创建新 Panel
     const panel = vscode.window.createWebviewPanel(
       PluginDetailsPanel.viewType,
@@ -51,9 +55,14 @@ export class PluginDetailsPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.joinPath(extensionUri, 'webview', 'dist')
-        ]
+        localResourceRoots: isDevelopment
+          ? [
+              vscode.Uri.joinPath(extensionUri, 'webview', 'dist'),
+              vscode.Uri.parse('http://localhost:5173')
+            ]
+          : [
+              vscode.Uri.joinPath(extensionUri, 'webview', 'dist')
+            ]
       }
     );
 
@@ -64,7 +73,8 @@ export class PluginDetailsPanel {
       dataStore,
       pluginName,
       marketplace,
-      isInstalled
+      isInstalled,
+      isDevelopment
     );
   }
 
@@ -78,11 +88,13 @@ export class PluginDetailsPanel {
     dataStore: PluginDataStore,
     private _pluginName: string,
     private _marketplace: string,
-    private _isInstalled: boolean
+    private _isInstalled: boolean,
+    isDevelopment: boolean
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._dataStore = dataStore;
+    this._isDevelopment = isDevelopment;
 
     // 订阅详情更新事件（如 stars 加载完成）
     this._disposables.push(
@@ -302,11 +314,50 @@ export class PluginDetailsPanel {
    * 生成 Webview HTML 内容
    */
   private _getHtmlForWebview(): string {
+    // 开发模式: 使用 Vite 开发服务器
+    if (this._isDevelopment) {
+      const initState = encodeURIComponent(JSON.stringify({
+        viewType: 'details',
+        pluginName: this._pluginName,
+        marketplace: this._marketplace
+      }));
+
+      // 获取 vscode API (防止 HMR 重复获取)
+      const vscodeApi = `<script type="text/javascript">(function() { if (!window.vscode) { const vscode = acquireVsCodeApi(); window.vscode = vscode; } })();<\/script>`;
+
+      return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-eval' 'unsafe-inline' http://localhost:5173; style-src http://localhost:5173 'unsafe-inline'; connect-src ws://localhost:5173 http://localhost:5173;">
+  <title>插件详情</title>
+</head>
+<body>
+  <div id="root"></div>
+  ${vscodeApi}
+  <script type="module">
+    // 连接到 Vite 开发服务器
+    import RefreshRuntime from 'http://localhost:5173/@react-refresh';
+    RefreshRuntime.injectIntoGlobalHook(window);
+    window.$RefreshReg$ = () => {};
+    window.$RefreshSig$ = () => (type) => type;
+    window.__vite_plugin_react_preamble_installed__ = true;
+
+    // 动态导入主应用并传递初始状态
+    const initState = decodeURIComponent('${initState}');
+    window.__DETAILS_INIT_STATE__ = JSON.parse(initState);
+    import('http://localhost:5173/src/details/main.tsx');
+  </script>
+</body>
+</html>`;
+    }
+
+    // 生产模式: 使用构建后的文件
     const scriptUri = this._panel.webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'details.js')
     );
 
-    // 现在每个入口点都有独立的 CSS 文件
     const styleUri = this._panel.webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'details.css')
     );

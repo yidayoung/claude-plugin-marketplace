@@ -5,9 +5,8 @@ import {
   PlusOutlined,
   DeleteOutlined,
   ReloadOutlined,
-  InfoCircleOutlined,
-  PoweroffOutlined,
-  SettingOutlined
+  EllipsisOutlined,
+  PoweroffOutlined
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { PluginData } from '../hooks';
@@ -77,24 +76,28 @@ export function PluginItem({ plugin, isHovered, onHoverChange }: PluginItemProps
   };
 
   const getActionMenu = (): MenuProps => {
-    const items: MenuProps['items'] = [];
+    const items: MenuProps['items'] = [
+      {
+        key: 'install',
+        label: plugin.installed ? '重新安装' : '安装',
+        icon: <PlusOutlined />,
+        onClick: handleInstall
+      }
+    ];
 
     if (plugin.installed) {
-      if (plugin.enabled === false) {
-        items.push({
-          key: 'enable',
-          label: '启用',
+      items.push(
+        {
+          type: 'divider'
+        },
+        {
+          key: plugin.enabled === false ? 'enable' : 'disable',
+          label: plugin.enabled === false ? '启用' : '禁用',
           icon: <PoweroffOutlined />,
-          onClick: handleEnable
-        });
-      } else {
-        items.push({
-          key: 'disable',
-          label: '禁用',
-          icon: <PoweroffOutlined />,
-          onClick: handleDisable
-        });
-      }
+          onClick: plugin.enabled === false ? handleEnable : handleDisable
+        }
+      );
+
       if (plugin.updateAvailable) {
         items.push({
           key: 'update',
@@ -103,32 +106,26 @@ export function PluginItem({ plugin, isHovered, onHoverChange }: PluginItemProps
           onClick: handleUpdate
         });
       }
-      items.push({
-        type: 'divider'
-      });
-      items.push({
-        key: 'uninstall',
-        label: '卸载',
-        icon: <DeleteOutlined />,
-        danger: true,
-        onClick: handleUninstall
-      });
-    } else {
-      items.push({
-        key: 'install',
-        label: '安装',
-        icon: <PlusOutlined />,
-        onClick: handleInstall
-      });
-    }
-    items.push({
-      key: 'info',
-      label: '查看详情',
-      icon: <InfoCircleOutlined />,
-      onClick: handleOpenDetails
-    });
 
-    return { items };
+      items.push(
+        {
+          type: 'divider'
+        },
+        {
+          key: 'uninstall',
+          label: '卸载',
+          icon: <DeleteOutlined />,
+          onClick: handleUninstall
+        }
+      );
+    }
+
+    return {
+      items,
+      onClick: () => {
+        // 点击菜单项后自动关闭
+      }
+    };
   };
 
   return (
@@ -171,62 +168,16 @@ export function PluginItem({ plugin, isHovered, onHoverChange }: PluginItemProps
             transition: 'opacity 0.15s'
           }}
         >
-          {plugin.installed ? (
-            <>
-              {plugin.enabled === false && (
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<PoweroffOutlined />}
-                  onClick={(e) => { e.stopPropagation(); handleEnable(); }}
-                  title="启用"
-                  style={{ padding: '0 4px', minWidth: 'auto' }}
-                />
-              )}
-              {plugin.updateAvailable && (
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<ReloadOutlined />}
-                  onClick={(e) => { e.stopPropagation(); handleUpdate(); }}
-                  title="更新"
-                  style={{ padding: '0 4px', minWidth: 'auto' }}
-                />
-              )}
-              <Dropdown menu={getActionMenu()} trigger={['click']}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<SettingOutlined />}
-                  onClick={(e) => e.stopPropagation()}
-                  title="更多操作"
-                  style={{ padding: '0 4px', minWidth: 'auto' }}
-                />
-              </Dropdown>
-            </>
-          ) : (
-            <>
-              <Button
-                type="primary"
-                size="small"
-                icon={<PlusOutlined />}
-                onClick={(e) => { e.stopPropagation(); handleInstall(); }}
-                style={{ fontSize: 12 }}
-              >
-                安装
-              </Button>
-              <Dropdown menu={getActionMenu()} trigger={['click']}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<SettingOutlined />}
-                  onClick={(e) => e.stopPropagation()}
-                  title="更多操作"
-                  style={{ padding: '0 4px', minWidth: 'auto' }}
-                />
-              </Dropdown>
-            </>
-          )}
+          <Dropdown menu={getActionMenu()} trigger={['click']} placement="bottomRight">
+            <Button
+              type="text"
+              size="small"
+              icon={<EllipsisOutlined />}
+              onClick={(e) => e.stopPropagation()}
+              title="操作"
+              style={{ padding: '0 4px', minWidth: 'auto' }}
+            />
+          </Dropdown>
         </div>
       </Flex>
     </div>

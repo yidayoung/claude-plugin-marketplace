@@ -121,7 +121,6 @@ export function MarketSectionActions({ marketName }: MarketSectionActionsProps) 
         icon={<DeleteOutlined />}
         onClick={handleRemoveMarket}
         title="删除市场"
-        danger
         style={{ padding: '0 4px', minWidth: 20 }}
       />
     </>

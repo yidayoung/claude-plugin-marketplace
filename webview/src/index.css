@@ -65,6 +65,48 @@ body {
 }
 
 /* ============================================
+   Dropdown 菜单样式
+   ============================================ */
+
+/* 修复菜单选中效果 */
+.ant-dropdown {
+  /* 确保 dropdown 能正常显示和隐藏 */
+}
+
+.ant-dropdown-menu {
+  background: var(--vscode-dropdown-background) !important;
+  border: 1px solid var(--vscode-dropdown-border) !important;
+  /* 确保菜单不会意外阻止鼠标离开事件 */
+  pointer-events: auto !important;
+}
+
+.ant-dropdown-menu-item,
+.ant-dropdown-menu-submenu-title {
+  color: var(--vscode-foreground) !important;
+  background: transparent !important;
+}
+
+.ant-dropdown-menu-item:hover,
+.ant-dropdown-menu-submenu-title:hover {
+  background: var(--vscode-menu-selectionBackground) !important;
+}
+
+.ant-dropdown-menu-item-selected {
+  background: var(--vscode-menu-selectionBackground) !important;
+}
+
+/* 修复菜单项图标颜色 */
+.ant-dropdown-menu-item .anticon,
+.ant-dropdown-menu-submenu-title .anticon {
+  color: var(--vscode-foreground);
+}
+
+/* 卸载按钮不使用 danger 颜色 */
+.ant-dropdown-menu-item .anticon + span {
+  color: var(--vscode-foreground);
+}
+
+/* ============================================
    Markdown 内容样式
    ============================================ */
 
