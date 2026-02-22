@@ -14,6 +14,8 @@ module.exports = {
   // 模块路径映射
   moduleNameMapper: {
     '^vscode$': '<rootDir>/__mocks__/vscode.ts',
+    '^@shared/(.*)$': '<rootDir>/src/shared/$1',
+    '^@webview/(.*)$': '<rootDir>/webview/src/$1',
   },
 
   // 只测试 __tests__ 目录下的文件（跳过 setup 文件）

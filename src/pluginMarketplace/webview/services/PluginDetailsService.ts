@@ -16,6 +16,7 @@ import {
   RepositoryInfo
 } from '../messages/types';
 import { PluginInfo } from '../../types';
+import { parseFrontmatter, parseGitHubRepo, getCustomPaths } from '@shared/utils/parseUtils';
 
 /**
  * 插件详情缓存条目
@@ -727,7 +728,10 @@ export class PluginDetailsService {
         return null;
       }
 
-      const repoInfo = this.parseGitHubRepo(market.source.repo);
+      const repoInfo = parseGitHubRepo(market.source.repo);
+      if (!repoInfo) {
+        return null;
+      }
       const stars = await this.fetchGitHubStars(repoInfo.owner, repoInfo.repo);
       console.log(`[PluginDetailsService] Fetched stars for ${pluginName}: ${stars}`);
       return stars;
@@ -737,27 +741,6 @@ export class PluginDetailsService {
     }
   }
 
-  /**
-   * 解析 GitHub 仓库信息
-   * 支持两种格式:
-   * - "owner/repo" (简写格式，来自 known_marketplaces.json)
-   * - "github.com/owner/repo" 或 "https://github.com/owner/repo" (完整 URL)
-   */
-  private parseGitHubRepo(repo: string): { owner: string; repo: string } {
-    // 先尝试简写格式 owner/repo (不包含 github.com)
-    const shortMatch = repo.match(/^([^/]+)\/([^/]+?)(\.git)?$/);
-    if (shortMatch && !repo.includes('github.com') && !repo.includes(':')) {
-      return { owner: shortMatch[1], repo: shortMatch[2].replace(/\.git$/, '') };
-    }
-
-    // 尝试完整 URL 格式
-    const fullMatch = repo.match(/github\.com[:/]([^/]+)\/(.+?)(\.git)?$/);
-    if (fullMatch) {
-      return { owner: fullMatch[1], repo: fullMatch[2].replace(/\.git$/, '') };
-    }
-
-    throw new Error(`无效的 GitHub 仓库地址: ${repo}`);
-  }
 
   /**
    * 解析 Skills
@@ -772,7 +755,7 @@ export class PluginDetailsService {
     const skills: SkillInfo[] = [];
 
     // 尝试从 plugin.json 获取自定义 skills 路径
-    const customPaths = this.getCustomPaths(configJson?.skills, pluginPath);
+    const customPaths = getCustomPaths(configJson?.skills, pluginPath);
 
     // 处理自定义路径（优先处理，因为这些路径是明确指定的）
     for (const customPath of customPaths) {
@@ -852,36 +835,12 @@ export class PluginDetailsService {
     return skills;
   }
 
-  /**
-   * 从 plugin.json 的 skills/agents/commands 等字段获取自定义路径
-   */
-  private getCustomPaths(fieldConfig: string | string[] | undefined, pluginPath: string): string[] {
-    const paths: string[] = [];
-
-    if (!fieldConfig) {
-      return paths;
-    }
-
-    const configs = Array.isArray(fieldConfig) ? fieldConfig : [fieldConfig];
-
-    for (const config of configs) {
-      if (typeof config === 'string') {
-        // 处理相对路径（如 ./.claude/skills/ui-ux-pro-max）
-        // 去掉开头的 ./ 如果存在
-        const relativePath = config.startsWith('./') ? config.slice(2) : config;
-        const fullPath = path.join(pluginPath, relativePath);
-        paths.push(fullPath);
-      }
-    }
-
-    return paths;
-  }
 
   /**
    * 解析单个 Skill 的 Markdown 文件
    */
   private parseSkillMarkdown(skillName: string, content: string): SkillInfo | null {
-    const frontmatter = this.parseFrontmatter(content);
+    const frontmatter = parseFrontmatter(content);
     if (!frontmatter) return null;
 
     return {
@@ -902,7 +861,7 @@ export class PluginDetailsService {
     const agents: AgentInfo[] = [];
 
     // 尝试从 plugin.json 获取自定义 agents 路径
-    const customPaths = this.getCustomPaths(configJson?.agents, pluginPath);
+    const customPaths = getCustomPaths(configJson?.agents, pluginPath);
 
     // 收集所有要搜索的 agents 目录
     const searchDirs: string[] = [...customPaths, path.join(pluginPath, 'agents')];
@@ -948,7 +907,7 @@ export class PluginDetailsService {
    * 解析单个 Agent 的 Markdown 文件
    */
   private parseAgentMarkdown(agentName: string, content: string): AgentInfo | null {
-    const frontmatter = this.parseFrontmatter(content);
+    const frontmatter = parseFrontmatter(content);
     if (!frontmatter) {
       // 没有 frontmatter，返回基本信息
       return { name: agentName, description: '' };
@@ -970,7 +929,7 @@ export class PluginDetailsService {
     const commands: CommandInfo[] = [];
 
     // 尝试从 plugin.json 获取自定义 commands 路径
-    const customPaths = this.getCustomPaths(configJson?.commands, pluginPath);
+    const customPaths = getCustomPaths(configJson?.commands, pluginPath);
 
     // 收集所有要搜索的 commands 目录
     const searchDirs: string[] = [...customPaths, path.join(pluginPath, 'commands')];
@@ -1014,7 +973,7 @@ export class PluginDetailsService {
    */
   private parseCommandMarkdown(commandName: string, content: string): CommandInfo {
     // 尝试从 frontmatter 获取描述
-    const frontmatter = this.parseFrontmatter(content);
+    const frontmatter = parseFrontmatter(content);
     if (frontmatter) {
       return {
         name: commandName,
@@ -1243,7 +1202,7 @@ export class PluginDetailsService {
     const outputStyles: OutputStyleInfo[] = [];
 
     // 尝试从 plugin.json 获取自定义 outputStyles 路径
-    const customPaths = this.getCustomPaths(configJson?.outputStyles, pluginPath);
+    const customPaths = getCustomPaths(configJson?.outputStyles, pluginPath);
 
     // 收集所有要搜索的 outputStyles 路径
     const searchPaths: string[] = [...customPaths, path.join(pluginPath, 'outputStyles')];
@@ -1284,23 +1243,6 @@ export class PluginDetailsService {
     return outputStyles;
   }
 
-  /**
-   * 解析 Skill/Agent Markdown 文件的 frontmatter
-   * 提取 --- 包裹的 YAML frontmatter 并使用标准 YAML 解析器
-   */
-  private parseFrontmatter(markdown: string): Record<string, any> | null {
-    // 支持 LF (\n) 和 CRLF (\r\n) 行尾符
-    const frontmatterMatch = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-    if (!frontmatterMatch) return null;
-
-    try {
-      // 使用标准 YAML 解析器
-      const yaml = require('yaml');
-      return yaml.parse(frontmatterMatch[1]);
-    } catch {
-      return null;
-    }
-  }
 
   /**
    * 解析仓库信息

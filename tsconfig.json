@@ -14,7 +14,8 @@
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
-      "@webview/*": ["webview/src/*"]
+      "@webview/*": ["webview/src/*"],
+      "@shared/*": ["src/shared/*"]
     }
   },
   "exclude": ["node_modules", ".vscode-test", "webview"],
