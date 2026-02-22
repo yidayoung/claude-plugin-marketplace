@@ -115,14 +115,9 @@ const DetailsApp: React.FC = () => {
           setError(null);
           messageReceivedRef.current = true; // 标记已收到消息
           break;
-        case 'starsUpdate':
-          // 星标数据变更时，请求完整重新拉取（而不是精细化更新）
-          vscode.postMessage({
-            type: 'refreshPluginDetail'
-          });
-          break;
+        case 'detailUpdate':
         case 'statusUpdate':
-          // 状态变更时，请求扩展侧重新发送完整的插件详情
+          // 插件数据变更时，请求完整重新拉取
           vscode.postMessage({
             type: 'refreshPluginDetail'
           });
