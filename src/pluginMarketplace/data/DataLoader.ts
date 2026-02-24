@@ -162,12 +162,10 @@ export class DataLoader {
     marketplace: string,
     isInstalled: boolean,
     enabled?: boolean,
-    scope?: 'user' | 'project' | 'local'
+    scope?: 'user' | 'project' | 'local',
+    locale?: string
   ): Promise<PluginDetailData> {
-    // 委托给现有的 PluginDetailsService
-    // 该服务已经实现了完整的解析逻辑（parseSkills, parseAgents 等）
-    // 传递 enabled 和 scope 状态，确保使用单一数据源
-    return this.pluginDetailsService.getPluginDetail(pluginName, marketplace, isInstalled, enabled, scope);
+    return this.pluginDetailsService.getPluginDetail(pluginName, marketplace, isInstalled, enabled, scope, locale);
   }
 
   /**

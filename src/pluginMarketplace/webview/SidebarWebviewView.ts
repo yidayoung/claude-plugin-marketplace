@@ -166,6 +166,7 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
 <body>
   <div id="root"></div>
   ${vscodeApi}
+  <!-- 使用 VS Code 官方 API：vscode.env.language 表示当前界面语言（如 en、zh-cn），扩展侧注入供 webview 使用 -->
   <script type="text/javascript">window.__LOCALE__ = ${JSON.stringify(vscode.env.language)};<\/script>
   <script type="module">
     // 连接到 Vite 开发服务器
@@ -212,6 +213,7 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
 <body>
   <div id="root"></div>
   <script nonce="${nonce}">
+    // vscode.env.language: 当前 IDE 显示语言（VS Code 官方 API，见 code.visualstudio.com/api/references/vscode-api#env）
     window.__LOCALE__ = ${JSON.stringify(vscode.env.language)};
     const vscode = acquireVsCodeApi();
     window.vscode = vscode;

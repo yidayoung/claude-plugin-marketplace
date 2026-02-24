@@ -164,7 +164,8 @@ export class PluginDetailsPanel {
 
     try {
       // 使用 PluginDataStore 获取插件详情（统一的数据源）
-      const detail = await this._dataStore.getPluginDetail(pluginName, marketplace, forceRefresh);
+      const locale = vscode.env.language;
+      const detail = await this._dataStore.getPluginDetail(pluginName, marketplace, forceRefresh, locale);
       this._panel.title = `插件详情: ${pluginName}`;
       this.sendMessage({
         type: 'pluginDetail',

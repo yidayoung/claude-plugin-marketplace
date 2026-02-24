@@ -353,7 +353,7 @@ export class PluginDataStore {
   /**
    * 获取插件详情（带缓存和请求去重）
    */
-  async getPluginDetail(pluginName: string, marketplace: string, forceRefresh = false): Promise<PluginDetailData> {
+  async getPluginDetail(pluginName: string, marketplace: string, forceRefresh = false, locale?: string): Promise<PluginDetailData> {
     const key = `${pluginName}@${marketplace}`;
 
     // 检查缓存（除非强制刷新）
@@ -369,8 +369,8 @@ export class PluginDataStore {
       return this.pendingRequests.get(key)!;
     }
 
-    // 启动新请求
-    const promise = this.fetchPluginDetail(pluginName, marketplace);
+    // 启动新请求（传入 locale 用于 README 多语言）
+    const promise = this.fetchPluginDetail(pluginName, marketplace, locale);
     this.pendingRequests.set(key, promise);
 
     try {
@@ -386,19 +386,20 @@ export class PluginDataStore {
    */
   private async fetchPluginDetail(
     pluginName: string,
-    marketplace: string
+    marketplace: string,
+    locale?: string
   ): Promise<PluginDetailData> {
     const key = `${pluginName}@${marketplace}`;
     const status = this.installedStatus.get(key);
     const isInstalled = status?.installed ?? false;
 
-    // 从 Store 传递状态给 PluginDetailsService，确保使用单一数据源
     const data = await this.dataLoader.getPluginDetail(
       pluginName,
       marketplace,
       isInstalled,
       status?.enabled,
-      status?.scope
+      status?.scope,
+      locale
     );
 
     // 获取市场源信息

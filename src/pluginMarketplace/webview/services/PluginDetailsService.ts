@@ -98,7 +98,8 @@ export class PluginDetailsService {
     marketplace: string,
     isInstalled: boolean,
     enabledFromStore?: boolean,
-    scopeFromStore?: 'user' | 'project' | 'local'
+    scopeFromStore?: 'user' | 'project' | 'local',
+    locale?: string
   ): Promise<PluginDetailData> {
     const cacheKey = `${pluginName}@${marketplace}`;
 
@@ -121,10 +122,10 @@ export class PluginDetailsService {
       };
     }
 
-    // 获取数据，传递来自 Store 的状态
+    // 获取数据，传递来自 Store 的状态与 locale（用于 README 多语言）
     const data = isInstalled
-      ? await this.getInstalledPluginDetail(pluginName, marketplace, enabledFromStore, scopeFromStore)
-      : await this.getRemotePluginDetail(pluginName, marketplace, enabledFromStore, scopeFromStore);
+      ? await this.getInstalledPluginDetail(pluginName, marketplace, enabledFromStore, scopeFromStore, locale)
+      : await this.getRemotePluginDetail(pluginName, marketplace, enabledFromStore, scopeFromStore, locale);
 
     // 更新缓存
     this.cache.set(cacheKey, {
@@ -172,18 +173,19 @@ export class PluginDetailsService {
     pluginName: string,
     marketplace: string,
     enabledFromStore?: boolean,
-    scopeFromStore?: 'user' | 'project' | 'local'
+    scopeFromStore?: 'user' | 'project' | 'local',
+    locale?: string
   ): Promise<PluginDetailData> {
     // 使用路径解析器查找插件
     const pluginPath = await this.pathResolver.findPluginPath(pluginName, marketplace);
     if (!pluginPath) {
       logger.debug(`插件 ${pluginName}@${marketplace} 未在本地找到，从远程获取`);
-      return this.getRemotePluginDetail(pluginName, marketplace, enabledFromStore, scopeFromStore);
+      return this.getRemotePluginDetail(pluginName, marketplace, enabledFromStore, scopeFromStore, locale);
     }
 
-    // 读取配置文件和 README
+    // 读取配置文件和 README（按 locale 优先 README.zh-CN.md）
     const configJson = await this.readPluginConfig(pluginPath);
-    const readme = await this.readReadme(pluginPath);
+    const readme = await this.readReadme(pluginPath, locale);
 
     // 使用内容解析器解析插件内容
     const [skills, agents, commands, hooks, mcps, lsps, outputStyles] = await Promise.all([
@@ -281,7 +283,8 @@ export class PluginDetailsService {
     pluginName: string,
     marketplace: string,
     enabledFromStore?: boolean,
-    scopeFromStore?: 'user' | 'project' | 'local'
+    scopeFromStore?: 'user' | 'project' | 'local',
+    locale?: string
   ): Promise<PluginDetailData> {
     // 从文件解析器获取市场信息
     const parser = await this.getFileParser();
@@ -348,8 +351,8 @@ export class PluginDetailsService {
           // 配置文件不存在，继续
         }
 
-        // 读取 README
-        readme = await this.readReadme(localMarketPath);
+        // 读取 README（按 locale 优先 README.zh-CN.md）
+        readme = await this.readReadme(localMarketPath, locale);
 
         // 使用内容解析器
         [skills, agents, commands, hooks, mcps, lsps, outputStyles] = await Promise.all([
@@ -446,12 +449,17 @@ export class PluginDetailsService {
   }
 
   /**
-   * 读取 README 文件
-   * 支持在插件目录或 .claude-plugin 目录中查找
+   * 读取 README 文件（支持多语言）
+   * 支持在插件目录或 .claude-plugin 目录中查找。
+   * 若传入 locale 且为 zh-cn，优先查找 README.zh-CN.md，否则使用 README.md。
    */
-  public async readReadme(pluginPath: string): Promise<string> {
+  public async readReadme(pluginPath: string, locale?: string): Promise<string> {
     const readmeLocations = [pluginPath, path.join(pluginPath, '.claude-plugin')];
-    const readmeNames = ['README.md', 'readme.md', 'Readme.md'];
+    const isZhCn = locale?.toLowerCase().startsWith('zh');
+
+    const readmeNames = isZhCn
+      ? ['README.zh-CN.md', 'readme.zh-CN.md', 'README.md', 'readme.md', 'Readme.md']
+      : ['README.md', 'readme.md', 'Readme.md'];
 
     for (const baseLocation of readmeLocations) {
       for (const name of readmeNames) {
