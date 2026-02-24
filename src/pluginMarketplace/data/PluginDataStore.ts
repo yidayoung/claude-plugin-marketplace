@@ -600,6 +600,13 @@ export class PluginDataStore {
   }
 
   /**
+   * 获取 GitHub stars（用于市场发现面板）
+   */
+  async fetchGitHubStars(owner: string, repo: string): Promise<number> {
+    return this.dataLoader.fetchGitHubStars(owner, repo);
+  }
+
+  /**
    * 从源提取市场名称（简单的启发式方法）
    */
   private extractMarketplaceNameFromSource(source: string): string {

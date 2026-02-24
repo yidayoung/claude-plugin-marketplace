@@ -6,10 +6,48 @@ import { PluginDetailsPanel } from './pluginMarketplace/webview/PluginDetailsPan
 import { MarketplacePanel } from './pluginMarketplace/webview/MarketplacePanel';
 import { SidebarWebviewViewProvider } from './pluginMarketplace/webview/SidebarWebviewView';
 import { PluginDataStore } from './pluginMarketplace/data/PluginDataStore';
+import { BUILTIN_MARKETPLACES } from './pluginMarketplace/data/MarketplaceConfig';
+import { logger } from './shared/utils/logger';
 
 // 插件市场全局变量
 let sidebarProvider: SidebarWebviewViewProvider | undefined;
 let dataStore: PluginDataStore | undefined;
+
+/**
+ * 后台预加载内置市场的 GitHub Stars
+ * 不阻塞扩展激活，异步执行
+ */
+function prefetchMarketplaceStars(dataStore: PluginDataStore): void {
+  // 延迟执行，避免阻塞扩展激活
+  setTimeout(async () => {
+    logger.info('[Marketplace] Starting background GitHub stars prefetch...');
+    let successCount = 0;
+    let errorCount = 0;
+
+    // 并行获取所有市场的 stars（限制并发数）
+    const concurrency = 3;
+    for (let i = 0; i < BUILTIN_MARKETPLACES.length; i += concurrency) {
+      const batch = BUILTIN_MARKETPLACES.slice(i, i + concurrency);
+      await Promise.all(
+        batch.map(async (market) => {
+          try {
+            const match = market.url.match(/github\.com\/([^/]+)\/([^/]+)/);
+            if (match) {
+              const [, owner, repo] = match;
+              await dataStore.fetchGitHubStars(owner, repo.replace('.git', ''));
+              successCount++;
+            }
+          } catch (error) {
+            errorCount++;
+            // 静默失败，不影响用户体验
+          }
+        })
+      );
+    }
+
+    logger.info(`[Marketplace] GitHub stars prefetch complete: ${successCount} success, ${errorCount} errors`);
+  }, 2000); // 延迟 2 秒执行
+}
 
 /**
  * 扩展激活入口
@@ -61,6 +99,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       });
     }
   });
+
+  // 后台预加载内置市场的 GitHub Stars
+  prefetchMarketplaceStars(dataStore!);
 
   // 注册侧边栏 WebviewViewProvider（不再需要 PluginDataService）
   sidebarProvider = new SidebarWebviewViewProvider(context.extensionUri, dataStore!);

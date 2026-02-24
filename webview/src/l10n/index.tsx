@@ -28,11 +28,12 @@ export function t(
 
 export type TFunction = (key: string, ...args: (string | number)[]) => string;
 
-export const L10nContext = React.createContext<{ t: TFunction }>({
-  t: (key: string) => key
+export const L10nContext = React.createContext<{ t: TFunction; locale: string }>({
+  t: (key: string) => key,
+  locale: 'en'
 });
 
-export function useL10n(): { t: TFunction } {
+export function useL10n(): { t: TFunction; locale: string } {
   return React.useContext(L10nContext);
 }
 
@@ -46,7 +47,7 @@ export function L10nProvider({
   const messagesMap = getMessages(locale);
   const tFn: TFunction = (key, ...args) => t(messagesMap, key, ...args);
   return (
-    <L10nContext.Provider value={{ t: tFn }}>
+    <L10nContext.Provider value={{ t: tFn, locale }}>
       {children}
     </L10nContext.Provider>
   );

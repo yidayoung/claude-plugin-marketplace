@@ -2,7 +2,7 @@
 .vscode-test/
 *.vsix
 dist/
-!webview/dist/
+webview/dist/
 out/
 
 # Node.js
@@ -55,8 +55,7 @@ logs/
 *.log
 
 # Webview 构建（源码在 webview/src，产物在 webview/dist）
-# 不忽略 webview/dist，因为它是运行时需要的
-# 但忽略 webview/.next 和 webview/node_modules
+# webview/dist/ 在发布时通过 vsce:prepublish 自动构建
 webview/.next/
 webview/node_modules/
 

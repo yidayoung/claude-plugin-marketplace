@@ -13,6 +13,11 @@ declare global {
   interface Window {
     __LOCALE__?: string;
     __MARKETPLACE_INIT_STATE__?: { locale?: string };
+    vscode: {
+      postMessage: (message: any) => void;
+      getState: () => any;
+      setState: (state: any) => void;
+    };
   }
 }
 
@@ -21,16 +26,23 @@ if ((window as Window).__MARKETPLACE_INIT_STATE__?.locale) {
   (window as Window).__LOCALE__ = (window as Window).__MARKETPLACE_INIT_STATE__!.locale;
 }
 
-// 获取 vscode API,如果已经存在则不重复获取
-if (!(window as any).vscode) {
+// 获取 vscode API（确保在任何时候都能获取）
+const getVSCodeApi = () => {
+  if ((window as Window).vscode) {
+    return (window as Window).vscode;
+  }
   try {
     const vscode = acquireVsCodeApi();
-    (window as any).vscode = vscode;
+    (window as Window).vscode = vscode;
+    return vscode;
   } catch (e) {
-    // 在开发环境下,HMR 可能导致此错误,可以忽略
-    console.warn('Failed to acquire vscode API:', e);
+    console.warn('[main] Failed to acquire vscode API:', e);
+    return null;
   }
-}
+};
+
+// 立即初始化 vscode API
+getVSCodeApi();
 
 const locale = (window as Window).__LOCALE__ || (window as Window).__MARKETPLACE_INIT_STATE__?.locale || 'en';
 

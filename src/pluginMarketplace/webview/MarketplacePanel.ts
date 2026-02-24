@@ -3,17 +3,18 @@
 import * as vscode from 'vscode';
 import { PluginDataStore } from '../data/PluginDataStore';
 import { StoreEvent } from '../data/types';
+import { BUILTIN_MARKETPLACES } from '../data/MarketplaceConfig';
 import { logger } from '../../shared/utils/logger';
 
 // Webview 消息类型
 type WebviewMessage = {
-  type: 'ready' | 'addMarketplace' | 'addRecommendedMarketplace' | 'openExternal';
+  type: 'ready' | 'addMarketplace' | 'addRecommendedMarketplace' | 'openExternal' | 'fetchGitHubStars' | 'removeMarketplace';
   payload?: any;
 };
 
 // Extension 消息类型
 type ExtensionMessage = {
-  type: 'marketplaceList' | 'error';
+  type: 'marketplaceList' | 'builtinMarkets' | 'error';
   payload?: any;
 };
 
@@ -138,6 +139,17 @@ export class MarketplacePanel {
   }
 
   /**
+   * 发送内置推荐市场列表到 webview
+   */
+  private sendBuiltinMarkets(): void {
+    logger.debug('[MarketplacePanel] Sending builtin markets, count:', BUILTIN_MARKETPLACES.length);
+    this.sendMessage({
+      type: 'builtinMarkets',
+      payload: { markets: BUILTIN_MARKETPLACES }
+    });
+  }
+
+  /**
    * 处理来自 Webview 的消息
    */
   private async handleMessage(message: any): Promise<void> {
@@ -149,6 +161,7 @@ export class MarketplacePanel {
           // Webview 准备好了，发送市场列表
           logger.debug('[MarketplacePanel] Webview ready, sending marketplace list');
           this.sendMarketplaceList();
+          this.sendBuiltinMarkets();
           break;
         }
         case 'addMarketplace':
@@ -170,6 +183,20 @@ export class MarketplacePanel {
         case 'openExternal':
           vscode.env.openExternal(vscode.Uri.parse(message.payload.url));
           break;
+        case 'fetchGitHubStars': {
+          const { marketplace, url } = message.payload;
+          // 从 URL 提取 owner/repo
+          const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+          if (match) {
+            const [, owner, repo] = match;
+            const stars = await this._dataStore.fetchGitHubStars(owner, repo);
+            this.sendMessage({
+              type: 'githubStars',
+              payload: { marketplace, stars }
+            });
+          }
+          break;
+        }
         case 'removeMarketplace': {
           const { marketplaceName } = message.payload;
           const result = await this._dataStore.removeMarketplace(marketplaceName);
