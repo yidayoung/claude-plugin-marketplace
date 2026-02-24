@@ -20,6 +20,7 @@ import { PluginPathResolver } from './PluginPathResolver';
 import { ContentParser } from './ContentParser';
 import { tryReadFile } from '@shared/utils/fileUtils';
 import { parseFrontmatter, parseGitHubRepo, getCustomPaths, parseRepository as parseRepositoryUtil } from '@shared/utils/parseUtils';
+import { normalizeRepoUrlForBrowser } from '@shared/utils/urlUtils';
 import { logger } from '../../../shared/utils/logger';
 
 /**
@@ -213,7 +214,10 @@ export class PluginDetailsService {
       actualMarketplace = status.actualMarketplace;
     }
 
-    const repository = configJson ? parseRepositoryUtil(configJson) : undefined;
+    const repoParsed = configJson ? parseRepositoryUtil(configJson) : undefined;
+    const repository = repoParsed?.url
+      ? { ...repoParsed, url: normalizeRepoUrlForBrowser(repoParsed.url) }
+      : repoParsed;
     const dependencies = configJson ? this.parseDependencies(configJson) : [];
 
 
@@ -335,7 +339,10 @@ export class PluginDetailsService {
           configJson = JSON.parse(configContent);
           license = configJson?.license;
           if (configJson?.repository) {
-            repository = parseRepositoryUtil(configJson);
+            const repoParsed = parseRepositoryUtil(configJson);
+            repository = repoParsed?.url
+              ? { ...repoParsed, url: normalizeRepoUrlForBrowser(repoParsed.url) }
+              : repoParsed;
           }
         } catch {
           // 配置文件不存在，继续
@@ -375,13 +382,13 @@ export class PluginDetailsService {
             // GitHub 类型：owner/repo
             repository = {
               type: 'github',
-              url: `https://github.com/${source.repo}`
+              url: normalizeRepoUrlForBrowser(`https://github.com/${source.repo}`)
             };
           } else if (source.source === 'url' && source.url) {
             // URL 类型：完整的 Git 仓库 URL
             repository = {
               type: 'other',
-              url: source.url
+              url: normalizeRepoUrlForBrowser(source.url)
             };
           }
         }
@@ -390,7 +397,7 @@ export class PluginDetailsService {
       if (!repository && plugin.homepage) {
         repository = {
           type: 'other',
-          url: plugin.homepage
+          url: normalizeRepoUrlForBrowser(plugin.homepage)
         };
       }
     }
