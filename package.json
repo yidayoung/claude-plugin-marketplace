@@ -3,10 +3,10 @@
   "displayName": "Claude Plugin Marketplace",
   "description": "%extension.description%",
   "version": "0.1.0",
-  "publisher": "gdd-team",
+  "publisher": "yidayoung",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gdd-team/claude-plugin-marketplace"
+    "url": "https://github.com/yidayoung/claude-plugin-marketplace"
   },
   "engines": {
     "vscode": "^1.80.0"

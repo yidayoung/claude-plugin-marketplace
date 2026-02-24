@@ -28,8 +28,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-org/claude-plugin-marketplace.git
-cd claude-plugin-marketplace/vscode-extension
+git clone https://github.com/yidayoung/claude-plugin-marketplace.git
+cd claude-plugin-marketplace
 
 # 安装依赖
 npm install
@@ -225,8 +225,8 @@ npm run dev
 
 ## 联系方式
 
-- 问题反馈: [GitHub Issues](https://github.com/your-org/claude-plugin-marketplace/issues)
-- 功能建议: [GitHub Discussions](https://github.com/your-org/claude-plugin-marketplace/discussions)
+- 问题反馈: [GitHub Issues](https://github.com/yidayoung/claude-plugin-marketplace/issues)
+- 功能建议: [GitHub Discussions](https://github.com/yidayoung/claude-plugin-marketplace/discussions)
 
 ## 更新日志
 

@@ -25,4 +25,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Locale source: **`vscode.env.language`** (VS Code API for current display language). Injected into webview as `window.__LOCALE__` when creating the webview.
 
-[0.1.0]: https://github.com/gdd-team/claude-plugin-marketplace/releases/tag/v0.1.0
+[0.1.0]: https://github.com/yidayoung/claude-plugin-marketplace/releases/tag/v0.1.0
