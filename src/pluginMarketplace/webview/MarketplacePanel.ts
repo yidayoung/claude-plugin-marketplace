@@ -5,6 +5,18 @@ import { PluginDataStore } from '../data/PluginDataStore';
 import { StoreEvent } from '../data/types';
 import { logger } from '../../shared/utils/logger';
 
+// Webview 消息类型
+type WebviewMessage = {
+  type: 'ready' | 'addMarketplace' | 'addRecommendedMarketplace' | 'openExternal';
+  payload?: any;
+};
+
+// Extension 消息类型
+type ExtensionMessage = {
+  type: 'marketplaceList' | 'error';
+  payload?: any;
+};
+
 /**
  * 市场发现 Webview Panel 管理器
  * 展示推荐市场和添加市场功能
@@ -82,9 +94,12 @@ export class MarketplacePanel {
     this._dataStore = dataStore;
     this._isDevelopment = isDevelopment;
 
+    logger.debug('[MarketplacePanel] Creating new panel');
+
     // 订阅市场变更事件
     this._disposables.push(
       this._dataStore.on(StoreEvent.MarketplaceChange, () => {
+        logger.debug('[MarketplacePanel] Marketplaces changed, sending updated list');
         this.sendMarketplaceList();
       })
     );
@@ -107,9 +122,6 @@ export class MarketplacePanel {
       null,
       this._disposables
     );
-
-    // 发送当前市场列表
-    this.sendMarketplaceList();
   }
 
   /**
@@ -118,6 +130,7 @@ export class MarketplacePanel {
   private sendMarketplaceList(): void {
     const marketplaces = this._dataStore.getMarketplaces();
     const marketplaceNames = marketplaces.map(m => m.name);
+    logger.debug('[MarketplacePanel] Sending marketplace list:', marketplaceNames);
     this.sendMessage({
       type: 'marketplaceList',
       payload: { marketplaces: marketplaceNames }
@@ -129,10 +142,19 @@ export class MarketplacePanel {
    */
   private async handleMessage(message: any): Promise<void> {
     try {
+      logger.debug('[MarketplacePanel] Received message:', message.type, message.payload);
+
       switch (message.type) {
+        case 'ready': {
+          // Webview 准备好了，发送市场列表
+          logger.debug('[MarketplacePanel] Webview ready, sending marketplace list');
+          this.sendMarketplaceList();
+          break;
+        }
         case 'addMarketplace':
         case 'addRecommendedMarketplace': {
           const { source } = message.payload;
+          logger.debug('[MarketplacePanel] Adding marketplace:', source);
           const result = await this._dataStore.addMarketplace(source);
           if (result.success) {
             vscode.window.showInformationMessage(
@@ -151,7 +173,13 @@ export class MarketplacePanel {
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error('[MarketplacePanel] Error handling message:', errorMsg);
       vscode.window.showErrorMessage(vscode.l10n.t('operation.failure', errorMsg));
+      // 同时发送错误消息到 webview
+      this.sendMessage({
+        type: 'error',
+        payload: { message: errorMsg }
+      });
     }
   }
 
@@ -180,9 +208,11 @@ export class MarketplacePanel {
   private _getHtmlForWebview(): string {
     // 开发模式: 使用 Vite 开发服务器
     if (this._isDevelopment) {
+      const title = vscode.l10n.t('marketplace.discover.title');
       const initState = encodeURIComponent(JSON.stringify({
         viewType: 'marketplace',
-        locale: vscode.env.language
+        locale: vscode.env.language,
+        title
       }));
 
       const vscodeApi = `<script type="text/javascript">(function() { if (!window.vscode) { const vscode = acquireVsCodeApi(); window.vscode = vscode; } })();<\/script>`;
@@ -193,7 +223,7 @@ export class MarketplacePanel {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-eval' 'unsafe-inline' http://localhost:5173; style-src http://localhost:5173 'unsafe-inline'; connect-src ws://localhost:5173 http://localhost:5173;">
-  <title>发现市场</title>
+  <title>${title}</title>
 </head>
 <body>
   <div id="root"></div>
@@ -222,9 +252,11 @@ export class MarketplacePanel {
       vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'marketplace.css')
     );
 
+    const title = vscode.l10n.t('marketplace.discover.title');
     const initState = encodeURIComponent(JSON.stringify({
       viewType: 'marketplace',
-      locale: vscode.env.language
+      locale: vscode.env.language,
+      title
     }));
 
     const scriptUriWithState = `${scriptUri}?init=${initState}`;
@@ -236,7 +268,7 @@ export class MarketplacePanel {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${this._panel.webview.cspSource} 'unsafe-inline' 'unsafe-eval'; style-src ${this._panel.webview.cspSource} 'unsafe-inline';">
   <link href="${styleUri}" rel="stylesheet">
-  <title>发现市场</title>
+  <title>${title}</title>
 </head>
 <body>
   <div id="root"></div>

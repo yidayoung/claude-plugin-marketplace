@@ -19,9 +19,11 @@ export type WebviewMessageType =
   | 'openDirectory'
   | 'refresh'
   | 'addMarketplace'
+  | 'addRecommendedMarketplace'
   | 'removeMarketplace'
   | 'updateMarketplace'
-  | 'executeCommand';
+  | 'executeCommand'
+  | 'ready';
 
 /**
  * Extension 发送给 Webview 的消息类型
@@ -41,7 +43,8 @@ export type ExtensionMessageType =
   | 'error'
   | 'pluginDetail'
   | 'detailUpdate'
-  | 'statusUpdate';
+  | 'statusUpdate'
+  | 'marketplaceList';
 
 /**
  * Webview 消息基础结构
