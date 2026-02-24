@@ -2,7 +2,7 @@
 .vscode-test/
 *.vsix
 dist/
-!vscode-extension/webview/dist/
+!webview/dist/
 out/
 
 # Node.js
