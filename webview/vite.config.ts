@@ -30,7 +30,9 @@ export default defineConfig({
         // 侧边栏
         sidebar: resolve(__dirname, 'src/sidebar/index.html'),
         // 插件详情
-        details: resolve(__dirname, 'src/details/index.html')
+        details: resolve(__dirname, 'src/details/index.html'),
+        // 市场发现
+        marketplace: resolve(__dirname, 'src/marketplace/index.html')
       },
       output: {
         entryFileNames: '[name].js',
