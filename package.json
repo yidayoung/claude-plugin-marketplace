@@ -1,9 +1,13 @@
 {
-  "name": "@claude-marketplace/plugin",
+  "name": "claude-plugin-marketplace",
   "displayName": "Claude Plugin Marketplace",
-  "description": "Claude Code 插件市场：浏览、安装、管理 Claude Code 技能插件",
+  "description": "%extension.description%",
   "version": "0.1.0",
   "publisher": "gdd-team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gdd-team/claude-plugin-marketplace"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -25,7 +29,7 @@
       "activitybar": [
         {
           "id": "claude-marketplace-sidebar",
-          "title": "Plugin Market",
+          "title": "%view.containers.title%",
           "icon": "resources/icon.svg"
         }
       ]
@@ -35,53 +39,53 @@
         {
           "id": "claudePluginMarketplaceSidebar",
           "type": "webview",
-          "name": "插件市场"
+          "name": "%view.sidebar.name%"
         }
       ]
     },
     "commands": [
       {
         "command": "claudePluginMarketplace.refresh",
-        "title": "刷新插件列表",
+        "title": "%command.refresh.title%",
         "icon": "$(refresh)"
       },
       {
         "command": "claudePluginMarketplace.addMarketplace",
-        "title": "添加插件市场",
+        "title": "%command.addMarketplace.title%",
         "icon": "$(add)"
       },
       {
         "command": "claudePluginMarketplace.removeMarketplace",
-        "title": "删除插件市场"
+        "title": "%command.removeMarketplace.title%"
       },
       {
         "command": "claudePluginMarketplace.refreshMarketplace",
-        "title": "刷新插件市场"
+        "title": "%command.refreshMarketplace.title%"
       },
       {
         "command": "claudePluginMarketplace.installPlugin",
-        "title": "安装插件"
+        "title": "%command.installPlugin.title%"
       },
       {
         "command": "claudePluginMarketplace.uninstallPlugin",
-        "title": "卸载插件"
+        "title": "%command.uninstallPlugin.title%"
       },
       {
         "command": "claudePluginMarketplace.updatePlugin",
-        "title": "更新插件",
+        "title": "%command.updatePlugin.title%",
         "icon": "$(sync)"
       },
       {
         "command": "claudePluginMarketplace.showPluginDetails",
-        "title": "查看插件详情"
+        "title": "%command.showPluginDetails.title%"
       },
       {
         "command": "claudePluginMarketplace.enablePlugin",
-        "title": "启用插件"
+        "title": "%command.enablePlugin.title%"
       },
       {
         "command": "claudePluginMarketplace.disablePlugin",
-        "title": "禁用插件"
+        "title": "%command.disablePlugin.title%"
       }
     ]
   },

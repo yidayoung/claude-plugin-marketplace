@@ -1,0 +1,15 @@
+{
+  "extension.description": "Claude Code 插件市场：浏览、安装、管理 Claude Code 技能插件",
+  "view.containers.title": "Plugin Market",
+  "view.sidebar.name": "插件市场",
+  "command.refresh.title": "刷新插件列表",
+  "command.addMarketplace.title": "添加插件市场",
+  "command.removeMarketplace.title": "删除插件市场",
+  "command.refreshMarketplace.title": "刷新插件市场",
+  "command.installPlugin.title": "安装插件",
+  "command.uninstallPlugin.title": "卸载插件",
+  "command.updatePlugin.title": "更新插件",
+  "command.showPluginDetails.title": "查看插件详情",
+  "command.enablePlugin.title": "启用插件",
+  "command.disablePlugin.title": "禁用插件"
+}

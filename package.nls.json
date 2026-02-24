@@ -1,0 +1,15 @@
+{
+  "extension.description": "Claude Code Plugin Marketplace: browse, install, and manage Claude Code skill plugins",
+  "view.containers.title": "Plugin Market",
+  "view.sidebar.name": "Plugin Market",
+  "command.refresh.title": "Refresh plugin list",
+  "command.addMarketplace.title": "Add marketplace",
+  "command.removeMarketplace.title": "Remove marketplace",
+  "command.refreshMarketplace.title": "Refresh marketplace",
+  "command.installPlugin.title": "Install plugin",
+  "command.uninstallPlugin.title": "Uninstall plugin",
+  "command.updatePlugin.title": "Update plugin",
+  "command.showPluginDetails.title": "Show plugin details",
+  "command.enablePlugin.title": "Enable plugin",
+  "command.disablePlugin.title": "Disable plugin"
+}
