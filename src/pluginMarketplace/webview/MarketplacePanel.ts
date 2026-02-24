@@ -248,10 +248,6 @@ export class MarketplacePanel {
       vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'marketplace.js')
     );
 
-    const styleUri = this._panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'marketplace.css')
-    );
-
     const title = vscode.l10n.t('marketplace.discover.title');
     const initState = encodeURIComponent(JSON.stringify({
       viewType: 'marketplace',
@@ -267,7 +263,6 @@ export class MarketplacePanel {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${this._panel.webview.cspSource} 'unsafe-inline' 'unsafe-eval'; style-src ${this._panel.webview.cspSource} 'unsafe-inline';">
-  <link href="${styleUri}" rel="stylesheet">
   <title>${title}</title>
 </head>
 <body>
