@@ -8,7 +8,7 @@ import { logger } from '../../shared/utils/logger';
 
 // Webview 消息类型
 type WebviewMessage = {
-  type: 'ready' | 'addMarketplace' | 'addRecommendedMarketplace' | 'openExternal' | 'fetchGitHubStars' | 'removeMarketplace';
+  type: 'ready' | 'addMarketplace' | 'addRecommendedMarketplace' | 'openExternal' | 'removeMarketplace';
   payload?: any;
 };
 
@@ -17,6 +17,12 @@ type ExtensionMessage = {
   type: 'marketplaceList' | 'builtinMarkets' | 'error';
   payload?: any;
 };
+
+// 市场信息（带 stars）
+interface MarketplaceWithStars {
+  name: string;
+  stars: number;
+}
 
 /**
  * 市场发现 Webview Panel 管理器
@@ -126,15 +132,36 @@ export class MarketplacePanel {
   }
 
   /**
-   * 发送当前市场列表到 webview
+   * 发送当前市场列表到 webview（包含缓存的 stars 数据）
    */
   private sendMarketplaceList(): void {
     const marketplaces = this._dataStore.getMarketplaces();
-    const marketplaceNames = marketplaces.map(m => m.name);
-    logger.debug('[MarketplacePanel] Sending marketplace list:', marketplaceNames);
+    const marketplacesWithStars: MarketplaceWithStars[] = marketplaces.map(m => ({
+      name: m.name,
+      stars: this._dataStore.getMarketplaceStars(m.name),
+    }));
+
+    // 同时发送内置市场的 stars 数据（用于未安装的市场显示）
+    const builtinStars: Record<string, number> = {};
+    for (const builtin of BUILTIN_MARKETPLACES) {
+      // 如果已安装，使用已有的 stars；否则从缓存获取
+      const existing = marketplacesWithStars.find(m => m.name === builtin.name);
+      if (existing) {
+        builtinStars[builtin.name] = existing.stars;
+      } else {
+        // 从内置配置中提取 owner/repo 并获取 stars
+        builtinStars[builtin.name] = this._dataStore.getMarketplaceStars(builtin.name);
+      }
+    }
+
+    logger.debug('[MarketplacePanel] Sending marketplace list with stars:', marketplacesWithStars);
+    logger.debug('[MarketplacePanel] Sending builtin stars:', builtinStars);
     this.sendMessage({
       type: 'marketplaceList',
-      payload: { marketplaces: marketplaceNames }
+      payload: {
+        marketplaces: marketplacesWithStars,
+        builtinStars  // 包含所有内置市场的 stars（包括未安装的）
+      }
     });
   }
 
@@ -183,20 +210,6 @@ export class MarketplacePanel {
         case 'openExternal':
           vscode.env.openExternal(vscode.Uri.parse(message.payload.url));
           break;
-        case 'fetchGitHubStars': {
-          const { marketplace, url } = message.payload;
-          // 从 URL 提取 owner/repo
-          const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
-          if (match) {
-            const [, owner, repo] = match;
-            const stars = await this._dataStore.fetchGitHubStars(owner, repo);
-            this.sendMessage({
-              type: 'githubStars',
-              payload: { marketplace, stars }
-            });
-          }
-          break;
-        }
         case 'removeMarketplace': {
           const { marketplaceName } = message.payload;
           const result = await this._dataStore.removeMarketplace(marketplaceName);

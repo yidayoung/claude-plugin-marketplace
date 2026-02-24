@@ -5,7 +5,6 @@ import { message } from 'antd';
 import { StarOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useL10n } from '@/l10n';
 import { useVSCodeTheme, getVSCodeColors } from './useVSCodeTheme';
-import { useGitHubStars } from './useGitHubStars';
 import { MarketplaceHeader } from './MarketplaceHeader';
 import { CustomMarketInput } from './CustomMarketInput';
 import { MarketplaceSection } from './MarketplaceSection';
@@ -14,7 +13,8 @@ import type { LocalizedMarketplace } from './config';
 interface MarketplaceListMessage {
   type: 'marketplaceList';
   payload: {
-    marketplaces: string[];
+    marketplaces: Array<{ name: string; stars: number }>;
+    builtinStars?: Record<string, number>;  // 所有内置市场的 stars（包括未安装的）
   };
 }
 
@@ -31,44 +31,46 @@ function MarketplaceApp() {
   const [addedMarketplaces, setAddedMarketplaces] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<string | null>(null);
   const [builtinMarkets, setBuiltinMarkets] = useState<LocalizedMarketplace[]>([]);
+  // 后端提供的 stars 数据 (marketplaceName -> stars)
+  const [serverStars, setServerStars] = useState<Record<string, number>>({});
   const theme = useVSCodeTheme();
   const colors = getVSCodeColors(theme);
 
-  // 从内置市场列表中提取精选和全部市场
-  const rawFeaturedMarkets = useMemo(() => builtinMarkets.filter(m => m.featured), [builtinMarkets]);
-  const rawAllMarkets = useMemo(() => builtinMarkets, [builtinMarkets]);
+  // 从内置市场列表中提取精选和全部市场，并合并后端的 stars 数据
+  const featuredMarkets = useMemo(() => {
+    return builtinMarkets
+      .filter(m => m.featured)
+      .map(m => ({
+        ...m,
+        stars: serverStars[m.name] ?? m.stars
+      }));
+  }, [builtinMarkets, serverStars]);
 
-  // 本地化内置市场
+  const allMarkets = useMemo(() => {
+    return builtinMarkets.map(m => ({
+      ...m,
+      stars: serverStars[m.name] ?? m.stars
+    }));
+  }, [builtinMarkets, serverStars]);
+
+  // 本地化市场
   const localizedFeaturedMarkets = useMemo(() =>
-    rawFeaturedMarkets.map(m => ({
+    featuredMarkets.map(m => ({
       ...m,
       displayName: locale === 'zh-cn' ? m.displayName : m.displayNameEn,
       description: locale === 'zh-cn' ? m.description : m.descriptionEn
     })),
-    [rawFeaturedMarkets, locale]
+    [featuredMarkets, locale]
   );
 
   const localizedAllMarkets = useMemo(() =>
-    rawAllMarkets.map(m => ({
+    allMarkets.map(m => ({
       ...m,
       displayName: locale === 'zh-cn' ? m.displayName : m.displayNameEn,
       description: locale === 'zh-cn' ? m.description : m.descriptionEn
     })),
-    [rawAllMarkets, locale]
+    [allMarkets, locale]
   );
-
-  // 异步加载 GitHub 星数
-  const featuredMarkets = useGitHubStars(localizedFeaturedMarkets);
-  const allMarkets = useGitHubStars(localizedAllMarkets);
-
-  // 调试日志
-  console.log('[MarketplaceApp] Render state:', {
-    builtinMarkets: builtinMarkets.length,
-    rawFeaturedMarkets: rawFeaturedMarkets.length,
-    localizedFeaturedMarkets: localizedFeaturedMarkets.length,
-    featuredMarkets: featuredMarkets.length,
-    allMarkets: allMarkets.length
-  });
 
   // 监听来自 extension 的消息
   useEffect(() => {
@@ -78,7 +80,20 @@ function MarketplaceApp() {
 
       if (msg.type === 'marketplaceList') {
         console.log('[MarketplaceApp] marketplaceList:', msg.payload);
-        setAddedMarketplaces(new Set(msg.payload.marketplaces));
+        // 从新的格式中提取市场名称和 stars
+        const marketplaceNames = new Set(msg.payload.marketplaces.map(m => m.name));
+        const stars: Record<string, number> = {};
+        msg.payload.marketplaces.forEach(m => {
+          stars[m.name] = m.stars;
+        });
+
+        // 合并内置市场的 stars 数据（包括未安装的市场）
+        if (msg.payload.builtinStars) {
+          Object.assign(stars, msg.payload.builtinStars);
+        }
+
+        setAddedMarketplaces(marketplaceNames);
+        setServerStars(stars);
         // 清除所有 loading 状态，因为操作已完成
         setLoading(null);
       }
@@ -162,7 +177,7 @@ function MarketplaceApp() {
         title={t('marketplace.discover.featuredMarkets')}
         icon={<StarOutlined />}
         iconColor="#F59E0B"
-        markets={featuredMarkets}
+        markets={localizedFeaturedMarkets}
         theme={theme}
         addedMarketplaces={addedMarketplaces}
         loading={loading}
@@ -175,7 +190,7 @@ function MarketplaceApp() {
         title={t('marketplace.discover.allMarkets')}
         icon={<ThunderboltOutlined />}
         iconColor="#7C3AED"
-        markets={allMarkets}
+        markets={localizedAllMarkets}
         theme={theme}
         addedMarketplaces={addedMarketplaces}
         loading={loading}

@@ -141,8 +141,7 @@ export class MessageHandler {
             case 'not-installed':
               return !plugin.installed;
             case 'upgradable':
-              // TODO: 实现版本比较逻辑
-              return false;
+              return plugin.updateAvailable === true;
             default:
               return true;
           }
@@ -161,7 +160,7 @@ export class MessageHandler {
         installed: p.installed,
         enabled: p.enabled,
         scope: p.scope,
-        updateAvailable: false // TODO: 实现版本比较
+        updateAvailable: p.updateAvailable ?? false
       }));
 
       const responsePayload: PluginsPayload = {
@@ -490,8 +489,7 @@ export class MessageHandler {
 
   /**
    * 更新插件
-   * 先卸载再安装最新版本
-   * 使用 PluginDataStore 统一管理，会自动触发事件
+   * 使用 PluginDataStore 的 updatePlugin 方法
    */
   private async handleUpdatePlugin(payload: UpdatePluginPayload): Promise<void> {
     const { pluginName, marketplace } = payload;
@@ -504,18 +502,33 @@ export class MessageHandler {
       },
       async () => {
         try {
-          // 先卸载
-          await this.dataStore.uninstallPlugin(pluginName);
+          // 使用 PluginDataStore 更新插件
+          const result = await this.dataStore.updatePlugin(pluginName, marketplace);
 
-          // 再安装
-          await this.dataStore.installPlugin(pluginName, marketplace, 'user');
+          if (result.success) {
+            const versionText = result.newVersion
+              ? vscode.l10n.t(' to version {0}', result.newVersion)
+              : '';
 
-          this.sendMessage({
-            type: 'installSuccess',
-            payload: { pluginName, scope: 'user' }
-          });
+            this.sendMessage({
+              type: 'installSuccess',
+              payload: { pluginName, scope: 'user' }
+            });
 
-          vscode.window.showInformationMessage(vscode.l10n.t('Plugin {0} updated successfully', pluginName));
+            vscode.window.showInformationMessage(
+              vscode.l10n.t('Plugin {0} updated successfully{1}', pluginName, versionText)
+            );
+          } else {
+            const errorMessage = result.error || vscode.l10n.t('Unknown error');
+            this.sendMessage({
+              type: 'installError',
+              payload: { pluginName, error: errorMessage }
+            });
+
+            vscode.window.showErrorMessage(
+              vscode.l10n.t('Plugin {0} update failed: {1}', pluginName, errorMessage)
+            );
+          }
         } catch (error: any) {
           const errorMessage = error.message || vscode.l10n.t('Unknown error');
           this.sendMessage({
@@ -523,7 +536,9 @@ export class MessageHandler {
             payload: { pluginName, error: errorMessage }
           });
 
-          vscode.window.showErrorMessage(vscode.l10n.t('Plugin {0} update failed: {1}', pluginName, errorMessage));
+          vscode.window.showErrorMessage(
+            vscode.l10n.t('Plugin {0} update failed: {1}', pluginName, errorMessage)
+          );
           throw error;
         }
       }

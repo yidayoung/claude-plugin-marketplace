@@ -8,11 +8,22 @@ import {
   InstalledStatus,
   DetailCacheEntry,
   StoreEvent,
+  extractGitHubOwnerRepo,
+  parseGitHubUrl,
 } from './types';
 import { storeEvents } from './events';
 import { execClaudeCommand } from '../types';
 import { PluginDetailData } from '../webview/messages/types';
 import { logger } from '../../shared/utils/logger';
+import { compareVersions } from './types';
+
+/**
+ * Stars 缓存条目
+ */
+interface StarsCacheEntry {
+  stars: number;
+  timestamp: number;
+}
 
 /**
  * 插件数据存储
@@ -26,8 +37,12 @@ export class PluginDataStore {
   private pluginDetails = new Map<string, DetailCacheEntry>(); // "name@marketplace" -> detail
   private pendingRequests = new Map<string, Promise<any>>();
 
+  // Stars 缓存 (marketplace -> stars)
+  private marketplaceStars = new Map<string, StarsCacheEntry>();
+
   // 缓存配置
   private readonly DETAIL_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
+  private readonly STARS_CACHE_KEY = 'marketplaceStars'; // globalState 存储键
 
   private dataLoader: DataLoader;
   private isInitialized = false;
@@ -47,6 +62,9 @@ export class PluginDataStore {
 
     logger.info('[PluginDataStore] 初始化中...');
 
+    // 从持久化存储加载 stars 缓存
+    this.loadStarsCache();
+
     // 并行加载市场列表和已安装插件
     const [marketplaces, installedPlugins] = await Promise.all([
       this.dataLoader.loadMarketplaces(),
@@ -61,6 +79,7 @@ export class PluginDataStore {
         installed: true,
         enabled: p.enabled ?? true,
         scope: p.scope,
+        installedVersion: p.version,  // 存储已安装版本
       });
     });
 
@@ -70,8 +89,158 @@ export class PluginDataStore {
     // 修复：对于没有正确 marketplace 的已安装插件，从 pluginList 中查找并更新
     this.fixInstalledPluginsMarketplace();
 
+    // 后台异步刷新所有市场的 stars 数据
+    this.refreshAllMarketplaceStars();
+
     this.isInitialized = true;
     logger.info('[PluginDataStore] 初始化完成');
+  }
+
+  /**
+   * 从 globalState 加载 stars 缓存
+   */
+  private loadStarsCache(): void {
+    try {
+      const cached = this.context.globalState.get<Record<string, StarsCacheEntry>>(this.STARS_CACHE_KEY);
+      if (cached) {
+        for (const [marketplace, entry] of Object.entries(cached)) {
+          this.marketplaceStars.set(marketplace, entry);
+        }
+        logger.debug(`[PluginDataStore] 加载了 ${this.marketplaceStars.size} 个市场的 stars 缓存`);
+      }
+    } catch (error) {
+      logger.error('[PluginDataStore] 加载 stars 缓存失败:', error);
+    }
+  }
+
+  /**
+   * 保存 stars 缓存到 globalState
+   */
+  private saveStarsCache(): void {
+    try {
+      const obj: Record<string, StarsCacheEntry> = {};
+      for (const [marketplace, entry] of this.marketplaceStars.entries()) {
+        obj[marketplace] = entry;
+      }
+      this.context.globalState.update(this.STARS_CACHE_KEY, obj);
+    } catch (error) {
+      logger.error('[PluginDataStore] 保存 stars 缓存失败:', error);
+    }
+  }
+
+  /**
+   * 获取市场的 stars 数（从缓存或实时获取）
+   */
+  getMarketplaceStars(marketplace: string): number {
+    const cached = this.marketplaceStars.get(marketplace);
+    return cached?.stars ?? 0;
+  }
+
+  /**
+   * 后台异步刷新所有市场的 stars 数据
+   * 包括已安装市场和内置推荐市场
+   */
+  private async refreshAllMarketplaceStars(): Promise<void> {
+    const markets = Array.from(this.marketplaces.values());
+    logger.debug(`[PluginDataStore] 开始刷新 ${markets.length} 个已安装市场的 stars 数据`);
+
+    // 并行获取已安装市场的 stars，但不阻塞初始化
+    const promises = markets.map(market => this.refreshMarketplaceStars(market.name, market.source));
+    await Promise.allSettled(promises);
+
+    // 刷新内置推荐市场的 stars（包括未安装的）
+    await this.refreshBuiltinMarketplaceStars();
+
+    // 刷新完成后触发市场变更事件，通知前端更新显示
+    this.notifyMarketplaceChange();
+
+    logger.debug('[PluginDataStore] 所有市场的 stars 数据刷新完成');
+  }
+
+  /**
+   * 刷新内置推荐市场的 stars 数据
+   * 使用内置配置中的 source（owner/repo 格式）
+   */
+  private async refreshBuiltinMarketplaceStars(): Promise<void> {
+    // 动态导入 BUILTIN_MARKETPLACES 避免循环依赖
+    const { BUILTIN_MARKETPLACES } = await import('../data/MarketplaceConfig');
+
+    logger.debug(`[PluginDataStore] 开始刷新 ${BUILTIN_MARKETPLACES.length} 个内置市场的 stars 数据`);
+
+    const promises = BUILTIN_MARKETPLACES.map(async (builtin) => {
+      // 检查是否已经有缓存的 stars（避免重复请求）
+      if (this.marketplaceStars.has(builtin.name)) {
+        return;
+      }
+
+      // 从内置配置的 source 字段提取 owner/repo
+      // source 格式: "owner/repo"
+      const source = builtin.source;
+      if (!source || !source.includes('/')) {
+        logger.debug(`[PluginDataStore] 内置市场 ${builtin.name} 的 source 无效: ${source}`);
+        return;
+      }
+
+      const [owner, repo] = source.split('/');
+      try {
+        const stars = await this.dataLoader.fetchGitHubStars(owner, repo);
+
+        // 更新缓存
+        this.marketplaceStars.set(builtin.name, {
+          stars,
+          timestamp: Date.now(),
+        });
+
+        logger.debug(`[PluginDataStore] 内置市场 ${builtin.name} stars: ${stars}`);
+      } catch (error) {
+        logger.error(`[PluginDataStore] 获取内置市场 ${builtin.name} 的 stars 失败:`, error);
+      }
+    });
+
+    await Promise.allSettled(promises);
+
+    // 保存到持久化存储
+    this.saveStarsCache();
+  }
+
+  /**
+   * 刷新单个市场的 stars 数据
+   * @param marketplaceName 市场名称
+   * @param source 市场源（MarketplaceSource 对象）
+   */
+  private async refreshMarketplaceStars(marketplaceName: string, source: any): Promise<void> {
+    // 使用统一函数提取 owner/repo
+    const ownerRepo = extractGitHubOwnerRepo(source);
+
+    if (!ownerRepo) {
+      logger.debug(`[PluginDataStore] ${marketplaceName} 不是 GitHub 类型的市场，跳过 stars 刷新`);
+      return;
+    }
+
+    const [owner, repo] = ownerRepo.split('/');
+    try {
+      const stars = await this.dataLoader.fetchGitHubStars(owner, repo.replace('.git', ''));
+
+      // 更新缓存
+      this.marketplaceStars.set(marketplaceName, {
+        stars,
+        timestamp: Date.now(),
+      });
+
+      // 保存到持久化存储
+      this.saveStarsCache();
+
+      logger.debug(`[PluginDataStore] ${marketplaceName} stars: ${stars}`);
+    } catch (error) {
+      logger.error(`[PluginDataStore] 获取 ${marketplaceName} 的 stars 失败:`, error);
+    }
+  }
+
+  /**
+   * 触发市场变更事件（用于 stars 更新后通知前端）
+   */
+  private notifyMarketplaceChange(): void {
+    storeEvents.emitMarketplaceChange();
   }
 
   /**
@@ -145,6 +314,10 @@ export class PluginDataStore {
           plugin.installed = status.installed;
           plugin.enabled = status.enabled;
           plugin.scope = status.scope;
+          // 检查是否有更新可用
+          if (status.installedVersion) {
+            plugin.updateAvailable = compareVersions(plugin.version, status.installedVersion) > 0;
+          }
         }
       }
     }
@@ -407,11 +580,7 @@ export class PluginDataStore {
 
     // 添加市场源信息到详情数据
     if (marketplaceInfo) {
-      data.marketplaceSource = {
-        source: marketplaceInfo.source.source as 'github' | 'url' | 'directory' | 'git',
-        repo: marketplaceInfo.source.repo,
-        url: marketplaceInfo.source.url,
-      };
+      data.marketplaceSource = marketplaceInfo.source;
     }
 
     // 更新缓存
@@ -434,18 +603,17 @@ export class PluginDataStore {
       return;
     }
 
-    // 解析 GitHub 仓库
-    const url = data.repository.url;
-    const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
-    if (!match) {
+    // 解析 GitHub 仓库 URL
+    const ownerRepo = parseGitHubUrl(data.repository.url);
+    if (!ownerRepo) {
       return;
     }
 
-    const [, owner, repo] = match;
+    const [owner, repo] = ownerRepo.split('/');
 
     // 后台获取
     this.dataLoader
-      .fetchGitHubStars(owner, repo.replace('.git', ''))
+      .fetchGitHubStars(owner, repo)
       .then((stars) => {
         // 更新缓存中的数据
         const key = `${pluginName}@${marketplace}`;
@@ -558,7 +726,7 @@ export class PluginDataStore {
    */
   async updateMarketplace(name: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const result = await execClaudeCommand(`plugin marketplace update "${name}`);
+      const result = await execClaudeCommand(`plugin marketplace update "${name}"`);
 
       if (result.status !== 'success') {
         return { success: false, error: result.error || '更新市场失败' };
@@ -580,6 +748,62 @@ export class PluginDataStore {
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message || '更新市场失败' };
+    }
+  }
+
+  /**
+   * 更新插件
+   * @param pluginName 插件名称
+   * @param marketplace 市场名称
+   */
+  async updatePlugin(pluginName: string, marketplace: string): Promise<{ success: boolean; error?: string; newVersion?: string }> {
+    try {
+      const command = `plugin update "${pluginName}@${marketplace}"`;
+      const result = await execClaudeCommand(command);
+
+      if (result.status !== 'success') {
+        return { success: false, error: result.error || '更新插件失败' };
+      }
+
+      // 重新加载该市场的插件列表（获取最新的远程版本）
+      await this.loadMarketplacePluginList(marketplace);
+
+      // 重新加载已安装插件列表
+      const installedPlugins = await this.dataLoader.loadInstalledPlugins();
+
+      // 更新已安装插件状态（特别是版本号）
+      for (const p of installedPlugins) {
+        const key = this.pluginKey(p.name, p.marketplace || '');
+        if (p.name === pluginName) {
+          this.installedStatus.set(key, {
+            installed: true,
+            enabled: p.enabled ?? true,
+            scope: p.scope,
+            installedVersion: p.version,  // 更新版本号
+          });
+        }
+      }
+
+      // 同步状态（这会清除 updateAvailable 标志）
+      this.syncInstalledStatus();
+
+      // 清除该插件的详情缓存
+      this.invalidatePluginDetail(pluginName, marketplace);
+
+      // 触发插件状态变更事件
+      storeEvents.emitPluginStatusChange({
+        pluginName,
+        marketplace,
+        change: 'installed',  // 复用 installed 事件表示更新完成
+      });
+
+      // 获取新版本号
+      const key = this.pluginKey(pluginName, marketplace);
+      const newVersion = this.installedStatus.get(key)?.installedVersion;
+
+      return { success: true, newVersion };
+    } catch (error: any) {
+      return { success: false, error: error.message || '更新插件失败' };
     }
   }
 

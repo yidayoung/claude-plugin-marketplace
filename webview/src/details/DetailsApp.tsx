@@ -6,18 +6,15 @@ import { ReloadOutlined, LoadingOutlined } from '@ant-design/icons';
 import DetailHeader from './DetailHeader';
 import DetailContent from './DetailContent';
 import { useL10n } from '../l10n';
+import type { Source } from '../types/sourceTypes';
 
 // 从 window 获取 vscode API（由 details/main.tsx 注入）
 declare const vscode: {
   postMessage: (message: any) => void;
 };
 
-// 本地类型定义
-export interface MarketplaceSource {
-  source: 'github' | 'url' | 'directory' | 'git';
-  repo?: string;
-  url?: string;
-}
+// 类型别名
+export type MarketplaceSource = Source;
 
 export interface PluginDetailData {
   name: string;

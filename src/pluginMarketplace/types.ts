@@ -6,6 +6,10 @@ import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { logger } from '../shared/utils/logger';
+import type { SourceType, Source, PluginSourceType } from '../shared/types/sourceTypes';
+
+// 导出类型供外部使用
+export type { SourceType, Source, PluginSourceType };
 
 const execAsync = promisify(exec);
 
@@ -47,7 +51,7 @@ export interface Plugin {
 export interface Marketplace {
   name: string;
   source: string;
-  type: 'url' | 'git' | 'local';
+  type: PluginSourceType;
 }
 
 /**
@@ -241,12 +245,7 @@ export interface SettingsData {
  */
 export interface KnownMarketplacesData {
   [name: string]: {
-    source: {
-      source: 'github' | 'git' | 'directory' | 'url';
-      repo?: string;
-      path?: string;
-      url?: string;
-    };
+    source: Source;
     installLocation: string;
     lastUpdated: string;
     autoUpdate?: boolean;
@@ -258,12 +257,7 @@ export interface KnownMarketplacesData {
  */
 export interface MarketplaceInfo {
   name: string;
-  source: {
-    source: 'github' | 'git' | 'directory' | 'url';
-    repo?: string;
-    path?: string;
-    url?: string;
-  };
+  source: Source;
   installLocation: string;
   lastUpdated: Date;
   autoUpdate?: boolean;
