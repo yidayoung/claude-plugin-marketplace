@@ -51,7 +51,7 @@ export class PluginDetailsPanel {
     // 创建新 Panel
     const panel = vscode.window.createWebviewPanel(
       PluginDetailsPanel.viewType,
-      `插件详情: ${pluginName}`,
+      vscode.l10n.t('Plugin details: {0}', pluginName),
       column,
       {
         enableScripts: true,
@@ -166,7 +166,7 @@ export class PluginDetailsPanel {
       // 使用 PluginDataStore 获取插件详情（统一的数据源）
       const locale = vscode.env.language;
       const detail = await this._dataStore.getPluginDetail(pluginName, marketplace, forceRefresh, locale);
-      this._panel.title = `插件详情: ${pluginName}`;
+      this._panel.title = vscode.l10n.t('Plugin details: {0}', pluginName);
       this.sendMessage({
         type: 'pluginDetail',
         payload: { plugin: detail }
@@ -205,11 +205,11 @@ export class PluginDetailsPanel {
           try {
             const { pluginName, marketplace, scope } = message.payload;
             await this._dataStore.installPlugin(pluginName, marketplace, scope as 'user' | 'project');
-            vscode.window.showInformationMessage(vscode.l10n.t('plugin.installSuccess', pluginName));
+            vscode.window.showInformationMessage(vscode.l10n.t('Plugin {0} installed successfully', pluginName));
             // 强制刷新详情面板（绕过缓存）
             await this.loadPluginDetail(this._pluginName, this._marketplace, true, true);
           } catch (error: any) {
-            vscode.window.showErrorMessage(vscode.l10n.t('plugin.installFailure', error.message || vscode.l10n.t('error.unknown')));
+            vscode.window.showErrorMessage(vscode.l10n.t('Install failed: {0}', error.message || vscode.l10n.t('Unknown error')));
           }
           break;
         case 'uninstallPlugin':
@@ -217,11 +217,11 @@ export class PluginDetailsPanel {
           try {
             const { pluginName } = message.payload;
             await this._dataStore.uninstallPlugin(pluginName);
-            vscode.window.showInformationMessage(vscode.l10n.t('plugin.uninstallSuccess', pluginName));
+            vscode.window.showInformationMessage(vscode.l10n.t('Plugin {0} uninstalled successfully', pluginName));
             // 事件系统会自动触发 UI 更新，但为了确保刷新，手动刷新一次
             await this.loadPluginDetail(this._pluginName, this._marketplace, false, true);
           } catch (error: any) {
-            vscode.window.showErrorMessage(vscode.l10n.t('plugin.uninstallFailure', error.message || vscode.l10n.t('error.unknown')));
+            vscode.window.showErrorMessage(vscode.l10n.t('Uninstall failed: {0}', error.message || vscode.l10n.t('Unknown error')));
           }
           break;
         case 'enablePlugin':
@@ -229,11 +229,11 @@ export class PluginDetailsPanel {
           try {
             const { pluginName, marketplace } = message.payload;
             await this._dataStore.enablePlugin(pluginName, marketplace);
-            vscode.window.showInformationMessage(vscode.l10n.t('plugin.enableSuccess', pluginName));
+            vscode.window.showInformationMessage(vscode.l10n.t('Plugin {0} enabled', pluginName));
             // 刷新详情面板
             await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled);
           } catch (error: any) {
-            vscode.window.showErrorMessage(vscode.l10n.t('plugin.enableFailure', error.message || vscode.l10n.t('error.unknown')));
+            vscode.window.showErrorMessage(vscode.l10n.t('Enable failed: {0}', error.message || vscode.l10n.t('Unknown error')));
           }
           break;
         case 'disablePlugin':
@@ -241,11 +241,11 @@ export class PluginDetailsPanel {
           try {
             const { pluginName, marketplace } = message.payload;
             await this._dataStore.disablePlugin(pluginName, marketplace);
-            vscode.window.showInformationMessage(vscode.l10n.t('plugin.disableSuccess', pluginName));
+            vscode.window.showInformationMessage(vscode.l10n.t('Plugin {0} disabled', pluginName));
             // 刷新详情面板
             await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled);
           } catch (error: any) {
-            vscode.window.showErrorMessage(vscode.l10n.t('plugin.disableFailure', error.message || vscode.l10n.t('error.unknown')));
+            vscode.window.showErrorMessage(vscode.l10n.t('Disable failed: {0}', error.message || vscode.l10n.t('Unknown error')));
           }
           break;
         case 'openExternal':
@@ -267,17 +267,17 @@ export class PluginDetailsPanel {
           if (supportedPlatforms.includes(process.platform)) {
             await vscode.env.openExternal(directoryUri);
           } else {
-            vscode.window.showWarningMessage(vscode.l10n.t('os.unsupported'));
+            vscode.window.showWarningMessage(vscode.l10n.t('Copy not supported on this system'));
           }
           break;
         case 'copyToClipboard':
           await vscode.env.clipboard.writeText(message.payload.text);
-          vscode.window.showInformationMessage(vscode.l10n.t('clipboard.copied'));
+          vscode.window.showInformationMessage(vscode.l10n.t('Copied to clipboard'));
           break;
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      vscode.window.showErrorMessage(vscode.l10n.t('operation.failure', errorMsg));
+      vscode.window.showErrorMessage(vscode.l10n.t('Operation failed: {0}', errorMsg));
     }
   }
 
@@ -322,7 +322,7 @@ export class PluginDetailsPanel {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-eval' 'unsafe-inline' http://localhost:5173; style-src http://localhost:5173 'unsafe-inline'; connect-src ws://localhost:5173 http://localhost:5173;">
-  <title>插件详情</title>
+  <title>${vscode.l10n.t('Plugin details')}</title>
 </head>
 <body>
   <div id="root"></div>
@@ -372,7 +372,7 @@ export class PluginDetailsPanel {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${this._panel.webview.cspSource} 'unsafe-inline' 'unsafe-eval'; style-src ${this._panel.webview.cspSource} 'unsafe-inline';">
   <link href="${styleUri}" rel="stylesheet">
-  <title>插件详情</title>
+  <title>${vscode.l10n.t('Plugin details')}</title>
 </head>
 <body>
   <div id="root"></div>

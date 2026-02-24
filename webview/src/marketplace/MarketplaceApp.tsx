@@ -57,6 +57,10 @@ const MarketplaceApp: React.FC = () => {
     };
 
     window.addEventListener('message', handleMessage);
+
+    // 发送 ready 消息通知 extension 已准备好
+    vscode.postMessage({ type: 'ready' });
+
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
