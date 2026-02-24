@@ -166,6 +166,7 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
 <body>
   <div id="root"></div>
   ${vscodeApi}
+  <script type="text/javascript">window.__LOCALE__ = ${JSON.stringify(vscode.env.language)};<\/script>
   <script type="module">
     // 连接到 Vite 开发服务器
     import RefreshRuntime from 'http://localhost:5173/@react-refresh';
@@ -211,7 +212,7 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
 <body>
   <div id="root"></div>
   <script nonce="${nonce}">
-    // 初始化 VS Code API
+    window.__LOCALE__ = ${JSON.stringify(vscode.env.language)};
     const vscode = acquireVsCodeApi();
     window.vscode = vscode;
   </script>

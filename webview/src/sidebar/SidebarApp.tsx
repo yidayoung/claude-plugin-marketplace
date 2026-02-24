@@ -14,6 +14,7 @@ import type { MenuProps } from 'antd';
 
 import { usePluginData, usePluginFilter, useHoverState } from '../hooks';
 import { PluginItem, PluginSection, MarketSectionActions } from '../components';
+import { useL10n } from '../l10n';
 
 const { Text } = Typography;
 
@@ -25,10 +26,10 @@ declare const vscode: {
 };
 
 const SidebarApp: React.FC = () => {
+  const { t } = useL10n();
   const { state, loadPlugins, setState } = usePluginData();
   const { groupedPlugins, stats } = usePluginFilter(state.plugins, state.filter);
   const { isHovered, setHovered } = useHoverState();
-
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['installed', 'available']));
 
   const handleSearch = (keyword: string) => {
@@ -53,7 +54,7 @@ const SidebarApp: React.FC = () => {
   if (state.loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <Spin size="small" tip="加载中..." />
+        <Spin size="small" tip={t('sidebar.loading')} />
       </div>
     );
   }
@@ -75,13 +76,13 @@ const SidebarApp: React.FC = () => {
   const settingsMenuItems: MenuProps['items'] = [
     {
       key: 'refresh',
-      label: '刷新',
+      label: t('sidebar.refresh'),
       icon: <ReloadOutlined />,
       onClick: loadPlugins
     },
     {
       key: 'addMarketplace',
-      label: '添加市场',
+      label: t('sidebar.addMarketplace'),
       icon: <AppstoreOutlined />,
       onClick: () => {
         vscode.postMessage({
@@ -95,7 +96,7 @@ const SidebarApp: React.FC = () => {
     },
     {
       key: 'updateAll',
-      label: '全部更新',
+      label: t('sidebar.updateAll'),
       icon: <SyncOutlined />,
       onClick: () => {
         state.plugins.filter(p => p.updateAvailable).forEach(p => {
@@ -114,7 +115,7 @@ const SidebarApp: React.FC = () => {
         {/* 搜索栏 + 设置按钮 */}
         <Flex align="center" gap={4} style={{ padding: '6px 8px' }}>
           <Input
-            placeholder="搜索插件..."
+            placeholder={t('sidebar.searchPlaceholder')}
             value={state.filter.keyword}
             onChange={(e) => handleSearch(e.target.value)}
             prefix={<SearchOutlined />}
@@ -127,7 +128,7 @@ const SidebarApp: React.FC = () => {
               type="text"
               size="small"
               icon={<MoreOutlined />}
-              title="更多操作"
+              title={t('sidebar.moreActions')}
               style={{ width: 28, height: 28, padding: 0 }}
             />
           </Dropdown>
@@ -137,12 +138,12 @@ const SidebarApp: React.FC = () => {
         <Flex justify="space-between" style={{ padding: '0 8px' }}>
           <Text type="secondary" style={{ fontSize: 11 }}>
             <CheckCircleOutlined style={{ marginRight: 4 }} />
-            已安装 {stats.installed} / 启用 {stats.enabled}
+            {t('sidebar.installedEnabled', String(stats.installed), String(stats.enabled))}
           </Text>
           {stats.updatable > 0 && (
             <Text style={{ fontSize: 11, color: '#faad14' }}>
               <SyncOutlined style={{ marginRight: 4 }} />
-              {stats.updatable} 个可更新
+              {t('sidebar.updatableCount', String(stats.updatable))}
             </Text>
           )}
         </Flex>
@@ -153,14 +154,14 @@ const SidebarApp: React.FC = () => {
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
           {groupedPlugins.installed.length === 0 && Object.keys(groupedPlugins.byMarketplace).length === 0 ? (
             <Empty
-              description={state.filter.keyword ? '没有找到匹配的插件' : '暂无插件'}
+              description={state.filter.keyword ? t('sidebar.noMatch') : t('sidebar.noPlugins')}
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           ) : (
             <>
               {groupedPlugins.installed.length > 0 && (
                 <PluginSection
-                  title="已安装"
+                  title={t('sidebar.installed')}
                   count={groupedPlugins.installed.length}
                   sectionKey="installed"
                   isExpanded={expandedSections.has('installed')}

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Typography, Collapse, Tag, Space, Alert } from 'antd';
+import { useL10n } from '../l10n';
 import {
   ThunderboltOutlined,
   RobotOutlined,
@@ -51,6 +52,7 @@ const ClickableTag: React.FC<ClickableTagProps> = ({ children, filePath, onOpenF
 };
 
 const ComponentsSection: React.FC<ComponentsSectionProps> = ({ plugin, onOpenFile }) => {
+  const { t } = useL10n();
   const hasSkills = plugin.skills?.length || 0;
   const hasAgents = plugin.agents?.length || 0;
   const hasHooks = plugin.hooks?.length || 0;
@@ -72,24 +74,23 @@ const ComponentsSection: React.FC<ComponentsSectionProps> = ({ plugin, onOpenFil
           border: '1px solid var(--vscode-panel-border)',
           width: '100%'
         }}>
-          <Title level={5} style={{ margin: 0 }}>插件内容</Title>
+          <Title level={5} style={{ margin: 0 }}>{t('components.title')}</Title>
           <Alert
             type="info"
             icon={<InfoCircleOutlined />}
-            message="内容未解析"
+            message={t('components.notParsed')}
             description={
               <span>
-                该插件尚未安装，无法获取详细的插件内容（Skills、Agents、Commands 等）。
-                安装后将显示完整信息。您可以在{' '}
+                {t('components.remoteHint')}{' '}
                 <a
                   href={plugin.repository.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: 'var(--vscode-textLink-foreground)' }}
                 >
-                  GitHub 仓库
+                  {t('components.githubRepo')}
                 </a>
-                {' '}查看详细信息。
+                {' '}{t('components.viewDetails')}
               </span>
             }
             showIcon
@@ -108,7 +109,7 @@ const ComponentsSection: React.FC<ComponentsSectionProps> = ({ plugin, onOpenFil
       border: '1px solid var(--vscode-panel-border)',
       width: '100%'
     }}>
-      <Title level={5} style={{ margin: 0 }}>插件内容</Title>
+      <Title level={5} style={{ margin: 0 }}>{t('components.title')}</Title>
       <Collapse
         ghost
         defaultActiveKey={['skills', 'agents', 'commands', 'hooks', 'mcps', 'lsps', 'outputStyles']}
@@ -190,7 +191,7 @@ const ComponentsSection: React.FC<ComponentsSectionProps> = ({ plugin, onOpenFil
                   <ClickableTag color="purple" filePath={hook.filePath} onOpenFile={onOpenFile}>
                     {hook.event}
                   </ClickableTag>
-                  <span>{hook.hooks.length} 个处理器</span>
+                  <span>{t('components.handlersCount', String(hook.hooks.length))}</span>
                 </Space>
               ))}
             </Space>

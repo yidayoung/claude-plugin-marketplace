@@ -4,8 +4,20 @@ import { ConfigProvider } from 'antd';
 import DetailsApp from './DetailsApp';
 import './details.css';
 import { antdTheme } from '@/theme/antd-theme';
+import { L10nProvider } from '@/l10n';
 
 declare const acquireVsCodeApi: () => any;
+
+declare global {
+  interface Window {
+    __LOCALE__?: string;
+    __DETAILS_INIT_STATE__?: { locale?: string };
+  }
+}
+
+if ((window as Window).__DETAILS_INIT_STATE__?.locale) {
+  (window as Window).__LOCALE__ = (window as Window).__DETAILS_INIT_STATE__!.locale;
+}
 
 // 获取 vscode API,如果已经存在则不重复获取
 if (!(window as any).vscode) {
@@ -18,10 +30,13 @@ if (!(window as any).vscode) {
   }
 }
 
+const locale = (window as Window).__LOCALE__ || (window as Window).__DETAILS_INIT_STATE__?.locale || 'en';
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ConfigProvider theme={antdTheme}>
-      <DetailsApp />
+      <L10nProvider locale={locale}>
+        <DetailsApp />
+      </L10nProvider>
     </ConfigProvider>
   </React.StrictMode>
 );

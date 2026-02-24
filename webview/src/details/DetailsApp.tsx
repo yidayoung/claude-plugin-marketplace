@@ -5,6 +5,7 @@ import { Spin, Alert, Button } from 'antd';
 import { ReloadOutlined, LoadingOutlined } from '@ant-design/icons';
 import DetailHeader from './DetailHeader';
 import DetailContent from './DetailContent';
+import { useL10n } from '../l10n';
 
 // 从 window 获取 vscode API（由 details/main.tsx 注入）
 declare const vscode: {
@@ -99,6 +100,7 @@ export interface RepositoryInfo {
 }
 
 const DetailsApp: React.FC = () => {
+  const { t } = useL10n();
   const [plugin, setPlugin] = useState<PluginDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -214,7 +216,7 @@ const DetailsApp: React.FC = () => {
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin indicator={<LoadingOutlined style={{ fontSize: 32 }} spin />} tip="加载插件详情..." />
+        <Spin indicator={<LoadingOutlined style={{ fontSize: 32 }} spin />} tip={t('detail.loading')} />
       </div>
     );
   }
@@ -228,7 +230,7 @@ const DetailsApp: React.FC = () => {
           description={error}
           action={
             <Button size="small" danger onClick={() => window.location.reload()}>
-              <ReloadOutlined /> 重试
+              <ReloadOutlined /> {t('detail.retry')}
             </Button>
           }
           showIcon
@@ -241,7 +243,7 @@ const DetailsApp: React.FC = () => {
   if (!plugin) {
     return (
       <div style={{ padding: 24 }}>
-        <Alert description="未找到插件信息" type="warning" showIcon />
+        <Alert description={t('detail.notFound')} type="warning" showIcon />
       </div>
     );
   }

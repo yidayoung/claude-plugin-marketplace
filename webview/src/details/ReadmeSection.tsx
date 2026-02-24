@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Typography, Space } from 'antd';
+import { useL10n } from '../l10n';
 import { FileTextOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -17,10 +18,9 @@ interface ReadmeSectionProps {
 }
 
 // 自定义链接组件，处理不同类型的链接
-const MarkdownLink: React.FC<{ href?: string; children: React.ReactNode }> = ({ href, children }) => {
+const MarkdownLink: React.FC<{ href?: string; children: React.ReactNode; fileLinkTitle?: string }> = ({ href, children, fileLinkTitle }) => {
   if (!href) return <>{children}</>;
 
-  // 外部链接 - 用浏览器打开
   if (href.startsWith('http://') || href.startsWith('https://')) {
     return (
       <a
@@ -35,7 +35,6 @@ const MarkdownLink: React.FC<{ href?: string; children: React.ReactNode }> = ({ 
     );
   }
 
-  // 相对文件链接 (.md 文件或 ./ 开头的路径)
   if (href.endsWith('.md') || href.startsWith('./') || href.startsWith('../')) {
     return (
       <a
@@ -44,7 +43,7 @@ const MarkdownLink: React.FC<{ href?: string; children: React.ReactNode }> = ({ 
           e.preventDefault();
           window.parent.postMessage({ type: 'openFileLink', payload: { path: href } }, '*');
         }}
-        title="文件链接（暂不支持直接访问）"
+        title={fileLinkTitle ?? 'File link (direct access not supported)'}
         style={{ cursor: 'not-allowed', opacity: 0.7 }}
       >
         {children}
@@ -78,10 +77,11 @@ const MarkdownImage: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = (prop
 };
 
 const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme }) => {
+  const { t } = useL10n();
   if (!readme) {
     return null;
   }
-
+  const linkComponent = (props: any) => <MarkdownLink {...props} fileLinkTitle={t('readme.fileLinkUnsupported')} />;
   return (
     <Space direction="vertical" size={12} style={{
       padding: 16,
@@ -91,14 +91,14 @@ const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme }) => {
       width: '100%'
     }}>
       <Title level={5} style={{ margin: 0 }}>
-        <FileTextOutlined /> README
+        <FileTextOutlined /> {t('readme.title')}
       </Title>
       <div className="markdown-body">
         <ReactMarkdown
           remarkPlugins={[remarkGfm, [remarkSlug as any]]}
           rehypePlugins={[rehypeRaw]}
           components={{
-            a: MarkdownLink as any,
+            a: linkComponent,
             img: MarkdownImage as any,
           }}
         >

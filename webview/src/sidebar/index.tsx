@@ -1,15 +1,16 @@
-// vscode-extension/webview/src/sidebar/index.tsx
-
 import ReactDOM from 'react-dom/client';
 import { ConfigProvider } from 'antd';
 import SidebarApp from './SidebarApp';
 import './sidebar.css';
 import { antdTheme } from '@/theme/antd-theme';
+import { L10nProvider } from '@/l10n';
 
-// 直接渲染，vscode API 由外部 HTML 提供并挂载到全局
+const locale = (window as any).__LOCALE__ || 'en';
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 root.render(
   <ConfigProvider theme={antdTheme}>
-    <SidebarApp />
+    <L10nProvider locale={locale}>
+      <SidebarApp />
+    </L10nProvider>
   </ConfigProvider>
 );

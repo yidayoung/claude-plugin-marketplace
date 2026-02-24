@@ -1,4 +1,5 @@
 import { Button, Flex, Typography, Dropdown } from 'antd';
+import { useL10n } from '../l10n';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -75,11 +76,12 @@ export function PluginItem({ plugin, isHovered, onHoverChange }: PluginItemProps
     });
   };
 
+  const { t } = useL10n();
   const getActionMenu = (): MenuProps => {
     const items: MenuProps['items'] = [
       {
         key: 'install',
-        label: plugin.installed ? '重新安装' : '安装',
+        label: plugin.installed ? t('item.reinstall') : t('item.install'),
         icon: <PlusOutlined />,
         onClick: handleInstall
       }
@@ -92,7 +94,7 @@ export function PluginItem({ plugin, isHovered, onHoverChange }: PluginItemProps
         },
         {
           key: plugin.enabled === false ? 'enable' : 'disable',
-          label: plugin.enabled === false ? '启用' : '禁用',
+          label: plugin.enabled === false ? t('item.enable') : t('item.disable'),
           icon: <PoweroffOutlined />,
           onClick: plugin.enabled === false ? handleEnable : handleDisable
         }
@@ -101,7 +103,7 @@ export function PluginItem({ plugin, isHovered, onHoverChange }: PluginItemProps
       if (plugin.updateAvailable) {
         items.push({
           key: 'update',
-          label: '更新',
+          label: t('item.update'),
           icon: <ReloadOutlined />,
           onClick: handleUpdate
         });
@@ -113,7 +115,7 @@ export function PluginItem({ plugin, isHovered, onHoverChange }: PluginItemProps
         },
         {
           key: 'uninstall',
-          label: '卸载',
+          label: t('item.uninstall'),
           icon: <DeleteOutlined />,
           onClick: handleUninstall
         }
@@ -122,9 +124,7 @@ export function PluginItem({ plugin, isHovered, onHoverChange }: PluginItemProps
 
     return {
       items,
-      onClick: () => {
-        // 点击菜单项后自动关闭
-      }
+      onClick: () => {}
     };
   };
 
@@ -174,7 +174,7 @@ export function PluginItem({ plugin, isHovered, onHoverChange }: PluginItemProps
               size="small"
               icon={<EllipsisOutlined />}
               onClick={(e) => e.stopPropagation()}
-              title="操作"
+              title={t('item.actions')}
               style={{ padding: '0 4px', minWidth: 'auto' }}
             />
           </Dropdown>

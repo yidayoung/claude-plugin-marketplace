@@ -308,7 +308,8 @@ export class PluginDetailsPanel {
       const initState = encodeURIComponent(JSON.stringify({
         viewType: 'details',
         pluginName: this._pluginName,
-        marketplace: this._marketplace
+        marketplace: this._marketplace,
+        locale: vscode.env.language
       }));
 
       // 获取 vscode API (防止 HMR 重复获取)
@@ -356,7 +357,8 @@ export class PluginDetailsPanel {
     const initState = encodeURIComponent(JSON.stringify({
       viewType: 'details',
       pluginName: this._pluginName,
-      marketplace: this._marketplace
+      marketplace: this._marketplace,
+      locale: vscode.env.language
     }));
 
     // 在 scriptUri 后面添加初始状态作为查询参数
@@ -373,6 +375,7 @@ export class PluginDetailsPanel {
 </head>
 <body>
   <div id="root"></div>
+  <script>window.__LOCALE__ = ${JSON.stringify(vscode.env.language)};</script>
   <script type="module" src="${scriptUriWithState}"></script>
 </body>
 </html>`;

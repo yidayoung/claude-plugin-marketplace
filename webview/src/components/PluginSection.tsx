@@ -1,5 +1,6 @@
 import React from 'react';
 import { Space, Flex, Typography, Button } from 'antd';
+import { useL10n } from '../l10n';
 import { CaretDownOutlined, CaretUpOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -89,6 +90,7 @@ interface MarketSectionActionsProps {
 }
 
 export function MarketSectionActions({ marketName }: MarketSectionActionsProps) {
+  const { t } = useL10n();
   const handleRefreshMarket = (e: React.MouseEvent) => {
     e.stopPropagation();
     vscode.postMessage({
@@ -112,7 +114,7 @@ export function MarketSectionActions({ marketName }: MarketSectionActionsProps) 
         size="small"
         icon={<ReloadOutlined />}
         onClick={handleRefreshMarket}
-        title="刷新市场"
+        title={t('section.refreshMarket')}
         style={{ padding: '0 4px', minWidth: 20 }}
       />
       <Button
@@ -120,7 +122,7 @@ export function MarketSectionActions({ marketName }: MarketSectionActionsProps) 
         size="small"
         icon={<DeleteOutlined />}
         onClick={handleRemoveMarket}
-        title="删除市场"
+        title={t('section.removeMarket')}
         style={{ padding: '0 4px', minWidth: 20 }}
       />
     </>

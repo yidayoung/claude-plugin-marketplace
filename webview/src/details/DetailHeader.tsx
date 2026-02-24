@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import type { PluginDetailData } from './DetailsApp';
+import { useL10n } from '../l10n';
 
 const { Text, Title } = Typography;
 
@@ -27,12 +28,6 @@ interface DetailHeaderProps {
   onOpenDirectory?: (directoryPath: string) => void;
 }
 
-const scopeConfig = {
-  user: { label: '用户', icon: <UserOutlined />, color: '#52c41a' },
-  project: { label: '项目', icon: <FolderOutlined />, color: '#1890ff' },
-  local: { label: '本地', icon: <FolderOutlined />, color: '#8c8c8c' }
-} as const;
-
 const DetailHeader: React.FC<DetailHeaderProps> = ({
   plugin,
   onInstall,
@@ -42,6 +37,12 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
   onOpenExternal,
   onOpenDirectory
 }) => {
+  const { t } = useL10n();
+  const scopeConfig = {
+    user: { label: t('header.scopeUser'), icon: <UserOutlined />, color: '#52c41a' },
+    project: { label: t('header.scopeProject'), icon: <FolderOutlined />, color: '#1890ff' },
+    local: { label: t('header.scopeLocal'), icon: <FolderOutlined />, color: '#8c8c8c' }
+  } as const;
   const isDisabled = plugin.installed && plugin.enabled === false;
   const scopeInfo = plugin.scope ? scopeConfig[plugin.scope] : null;
 
@@ -75,27 +76,24 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
   // 生成市场标题提示
   const getMarketplaceTitle = (plugin: PluginDetailData): string => {
     if (!plugin.marketplaceSource) {
-      return '未知市场类型';
+      return t('header.marketUnknown');
     }
-
     const { source } = plugin.marketplaceSource;
-
     if (source === 'directory') {
-      return '本地市场';
+      return t('header.marketLocal');
     }
-
     const url = getMarketplaceUrl(plugin);
-    return url ? `打开市场链接: ${url}` : '本地市场';
+    return url ? t('header.openMarketLink', url) : t('header.marketLocal');
   };
 
   const handleUninstallWithConfirm = () => {
     Modal.confirm({
-      title: '确认卸载',
-      content: `确定要卸载插件 "${plugin.name}" 吗？`,
-      okText: '卸载',
+      title: t('header.uninstallConfirmTitle'),
+      content: t('header.uninstallConfirmContent', plugin.name),
+      okText: t('header.uninstall'),
       okType: 'danger',
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('header.cancel'),
       onOk: onUninstall,
     });
   };
@@ -103,13 +101,13 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
   const installMenuItems: MenuProps['items'] = [
     {
       key: 'user',
-      label: '安装到用户',
+      label: t('header.installToUser'),
       icon: <UserOutlined />,
       onClick: () => onInstall('user')
     },
     {
       key: 'project',
-      label: '安装到项目',
+      label: t('header.installToProject'),
       icon: <FolderOutlined />,
       onClick: () => onInstall('project')
     }
@@ -125,7 +123,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
               {plugin.name}
             </Title>
             {plugin.localPath && onOpenDirectory && (
-              <Tooltip title="打开插件目录">
+              <Tooltip title={t('header.openPluginDir')}>
                 <Button
                   type="text"
                   size="small"
@@ -138,8 +136,8 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
             <Tag color="blue">v{plugin.version}</Tag>
           </Space>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            {plugin.author && `作者: ${plugin.author} · `}
-            来自{' '}
+            {plugin.author && `${t('header.author')}: ${plugin.author} · `}
+            {t('header.from')}{' '}
             <Text
               style={{
                 cursor: getMarketplaceUrl(plugin) ? 'pointer' : 'default',
@@ -167,7 +165,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
 
         <Space size="middle">
           {plugin.repository?.url && (
-            <Tooltip title="打开仓库">
+            <Tooltip title={t('header.openRepo')}>
               <Button
                 type="text"
                 icon={<GithubOutlined />}
@@ -176,7 +174,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
             </Tooltip>
           )}
           {plugin.homepage && plugin.homepage !== plugin.repository?.url && (
-            <Tooltip title="打开主页">
+            <Tooltip title={t('header.openHomepage')}>
               <Button
                 type="text"
                 icon={<LinkOutlined />}
@@ -187,7 +185,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
 
           {plugin.installed ? (
             <Space size="small">
-              <Tooltip title={isDisabled ? '启用插件' : '禁用插件'}>
+              <Tooltip title={isDisabled ? t('header.enablePlugin') : t('header.disablePlugin')}>
                 <Switch
                   checked={!isDisabled}
                   onChange={(checked) => (checked ? onEnable() : onDisable())}
@@ -208,7 +206,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
                   {scopeInfo.label}
                 </Tag>
               )}
-              <Tooltip title="卸载">
+              <Tooltip title={t('header.uninstallBtn')}>
                 <Button
                   type="text"
                   size="small"
@@ -225,7 +223,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
               type="primary"
               size="small"
             >
-              安装
+              {t('header.install')}
             </Dropdown.Button>
           )}
         </Space>

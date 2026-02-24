@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Typography, Tag, Space } from 'antd';
+import { useL10n } from '../l10n';
 import { FileTextOutlined } from '@ant-design/icons';
 import type { PluginDetailData } from './DetailsApp';
 import ComponentsSection from './ComponentsSection';
@@ -15,6 +16,7 @@ interface DetailContentProps {
 }
 
 const DetailContent: React.FC<DetailContentProps> = ({ plugin, onOpenFile }) => {
+  const { t } = useL10n();
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
       {plugin.description && (
@@ -26,7 +28,7 @@ const DetailContent: React.FC<DetailContentProps> = ({ plugin, onOpenFile }) => 
           width: '100%'
         }}>
           <Title level={5} style={{ margin: 0 }}>
-            <FileTextOutlined /> 详细描述
+            <FileTextOutlined /> {t('content.description')}
           </Title>
           <Paragraph style={{ fontSize: 14, marginBottom: 0 }}>
             {plugin.description}
@@ -46,10 +48,10 @@ const DetailContent: React.FC<DetailContentProps> = ({ plugin, onOpenFile }) => 
           border: '1px solid var(--vscode-panel-border)',
           width: '100%'
         }}>
-          <Title level={5} style={{ margin: 0 }}>元信息</Title>
+          <Title level={5} style={{ margin: 0 }}>{t('content.meta')}</Title>
           {plugin.dependencies?.length && (
             <Space direction="vertical" size={4}>
-              <Text type="secondary">依赖:</Text>
+              <Text type="secondary">{t('content.dependencies')}:</Text>
               <div style={{ marginTop: 4 }}>
                 {plugin.dependencies.map(dep => (
                   <Tag key={dep}>{dep}</Tag>
@@ -59,7 +61,7 @@ const DetailContent: React.FC<DetailContentProps> = ({ plugin, onOpenFile }) => 
           )}
           {plugin.license && (
             <Space style={{ marginTop: 8 }}>
-              <Text type="secondary">许可证:</Text>
+              <Text type="secondary">{t('content.license')}:</Text>
               <Tag>{plugin.license}</Tag>
             </Space>
           )}
