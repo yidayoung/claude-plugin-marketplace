@@ -84,5 +84,11 @@
   "Copy not supported on this system": "当前系统不支持复制",
   "Copied to clipboard": "已复制到剪贴板",
   "Operation failed: {0}": "操作失败: {0}",
-  "marketplace.discover.title": "发现市场"
+  "marketplace.discover.title": "发现市场",
+  "marketplace.discover.addCustom": "添加自定义市场",
+  "marketplace.discover.inputPlaceholder": "owner/repo 或 URL",
+  "marketplace.discover.addButton": "添加",
+  "marketplace.discover.recommended": "推荐市场",
+  "marketplace.discover.addedButton": "已添加",
+  "marketplace.discover.alreadyExists": "该市场已存在"
 }
