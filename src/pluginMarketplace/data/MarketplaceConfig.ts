@@ -43,8 +43,8 @@ export const BUILTIN_MARKETPLACES: BuiltinMarketplace[] = [
   {
     id: 'obra/superpowers-marketplace',
     name: 'superpowers-marketplace',
-    displayName: 'Superpowers 技能',
-    displayNameEn: 'Superpowers Skills',
+    displayName: 'superpowers',
+    displayNameEn: 'superpowers',
     description: '极受欢迎的 AI 代理开发方法论插件，支持 TDD 驱动的微任务规划',
     descriptionEn: 'Agentic skills framework for Claude Code, supporting TDD-driven micro-tasks',
     source: 'obra/superpowers-marketplace',
