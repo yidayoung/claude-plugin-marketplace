@@ -170,6 +170,20 @@ export class MarketplacePanel {
         case 'openExternal':
           vscode.env.openExternal(vscode.Uri.parse(message.payload.url));
           break;
+        case 'removeMarketplace': {
+          const { marketplaceName } = message.payload;
+          const result = await this._dataStore.removeMarketplace(marketplaceName);
+          if (result.success) {
+            vscode.window.showInformationMessage(
+              vscode.l10n.t('marketplace.removeSuccess', marketplaceName)
+            );
+          } else {
+            vscode.window.showErrorMessage(
+              vscode.l10n.t('marketplace.removeFailure', result.error ?? '')
+            );
+          }
+          break;
+        }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);

@@ -64,5 +64,6 @@
   "marketplace.discover.featured": "精选",
   "marketplace.discover.subtitle": "探索优质插件市场，扩展 Claude Code 的能力",
   "marketplace.discover.featuredMarkets": "精选市场",
-  "marketplace.discover.allMarkets": "全部市场"
+  "marketplace.discover.allMarkets": "全部市场",
+  "marketplace.discover.uninstallButton": "卸载"
 }

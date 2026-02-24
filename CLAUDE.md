@@ -188,6 +188,13 @@ await execClaudeCommand('plugin marketplace add <source>');
    - All state changes must emit appropriate events
    - UI components subscribe to events, never poll
 
+## Internationalization (i18n)
+
+- **Language source**: Use `vscode.env.language` (VS Code display language). Extension injects it into webview as `window.__LOCALE__`.
+- **Extension strings**: `package.nls.json` (default) + `package.nls.zh-cn.json` for contributes; `l10n/bundle.l10n.json` + `bundle.l10n.zh-cn.json` for runtime; use `vscode.l10n.t('key', ...args)` in extension code.
+- **Webview strings**: `webview/src/l10n/en.json` and `zh-cn.json`; use `useL10n().t('key', ...args)`. No hardcoded UI text.
+- **Plugin README**: `readReadme(pluginPath, locale)`—for `zh-cn` prefer `README.zh-CN.md`, else `README.md`. Pass `vscode.env.language` when calling `getPluginDetail`.
+
 ## Webview UI Conventions
 
 ### CSS & Styling Policy

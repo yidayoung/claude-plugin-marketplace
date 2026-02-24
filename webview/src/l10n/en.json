@@ -64,5 +64,6 @@
   "marketplace.discover.featured": "Featured",
   "marketplace.discover.subtitle": "Explore quality plugin marketplaces to extend Claude Code",
   "marketplace.discover.featuredMarkets": "Featured Marketplaces",
-  "marketplace.discover.allMarkets": "All Marketplaces"
+  "marketplace.discover.allMarkets": "All Marketplaces",
+  "marketplace.discover.uninstallButton": "Remove"
 }

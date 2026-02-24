@@ -12,6 +12,7 @@ export interface RecommendedMarketplace {
   description: string;
   descriptionEn: string;
   source: string;
+  url: string; // GitHub URL
   icon: string;
   category?: 'official' | 'community' | 'experimental';
   featured?: boolean;
@@ -29,6 +30,7 @@ export interface RecommendedMarketplace {
  *   description: '简短描述',
  *   descriptionEn: 'Short description',
  *   source: 'github.com/owner/repo',
+ *   url: 'https://github.com/owner/repo',
  *   icon: '🚀',
  *   category: 'community',
  *   featured: true
@@ -44,6 +46,7 @@ export const RECOMMENDED_MARKETPLACES: RecommendedMarketplace[] = [
     description: 'Anthropic 官方维护的插件集合，提供稳定可靠的官方插件',
     descriptionEn: 'Officially maintained plugins by Anthropic',
     source: 'github.com/anthropics/claude-plugins-official',
+    url: 'https://github.com/anthropics/claude-plugins-official',
     icon: '🔷',
     category: 'official',
     featured: true
@@ -58,6 +61,7 @@ export const RECOMMENDED_MARKETPLACES: RecommendedMarketplace[] = [
     description: '社区驱动的插件发现与分享平台，探索更多优质插件',
     descriptionEn: 'Community-driven plugin discovery platform',
     source: 'github.com/claude-automation/claude-plugin-marketplace',
+    url: 'https://github.com/claude-automation/claude-plugin-marketplace',
     icon: '🌟',
     category: 'community',
     featured: true
@@ -70,6 +74,7 @@ export const RECOMMENDED_MARKETPLACES: RecommendedMarketplace[] = [
     description: '自动化技能和工作流合集，提升 Claude Code 使用效率',
     descriptionEn: 'Automation skills and workflows for Claude Code',
     source: 'github.com/obra/superpowers-marketplace',
+    url: 'https://github.com/obra/superpowers-marketplace',
     icon: '⚡',
     category: 'community',
     featured: true
@@ -82,6 +87,7 @@ export const RECOMMENDED_MARKETPLACES: RecommendedMarketplace[] = [
     description: 'Claude Code 资源大全，包含教程、技巧和最佳实践',
     descriptionEn: 'Comprehensive resources for Claude Code',
     source: 'github.com/affaan-m/everything-claude-code',
+    url: 'https://github.com/affaan-m/everything-claude-code',
     icon: '📚',
     category: 'community'
   },
@@ -93,6 +99,7 @@ export const RECOMMENDED_MARKETPLACES: RecommendedMarketplace[] = [
     description: '专业 UI/UX 设计指南，包含 50+ 风格、97 种配色方案',
     descriptionEn: 'Professional UI/UX design guide with 50+ styles',
     source: 'github.com/nextlevelbuilder/ui-ux-pro-max-skill',
+    url: 'https://github.com/nextlevelbuilder/ui-ux-pro-max-skill',
     icon: '🎨',
     category: 'community'
   },
@@ -106,6 +113,7 @@ export const RECOMMENDED_MARKETPLACES: RecommendedMarketplace[] = [
     description: '探索前沿实验性插件，功能可能不稳定',
     descriptionEn: 'Cutting-edge experimental plugins',
     source: 'github.com/example/experimental-market',
+    url: 'https://github.com/example/experimental-market',
     icon: '🧪',
     category: 'experimental'
   }
