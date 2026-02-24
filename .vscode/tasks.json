@@ -14,12 +14,26 @@
     {
       "type": "shell",
       "command": "npx tsc-alias -w -p tsconfig.json",
-      "problemMatcher": [],
       "isBackground": true,
       "presentation": {
         "reveal": "never"
       },
-      "label": "vscode: tsc-alias"
+      "label": "vscode: tsc-alias",
+      "problemMatcher": [
+        {
+          "pattern": {
+            "regexp": "^(.*)$",
+            "file": 1,
+            "location": 2,
+            "message": 3
+          },
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".*",
+            "endsPattern": "Watching for file changes|Starting compilation"
+          }
+        }
+      ]
     },
     {
       "label": "vscode: watch",
@@ -37,13 +51,27 @@
     {
       "type": "npm",
       "script": "dev-webview",
-      "problemMatcher": [],
       "isBackground": true,
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"
       },
-      "label": "webview: dev server"
+      "label": "webview: dev server",
+      "problemMatcher": [
+        {
+          "pattern": {
+            "regexp": "^(.*)$",
+            "file": 1,
+            "location": 2,
+            "message": 3
+          },
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".*",
+            "endsPattern": "Local:.*http.*|ready in \\d+ ms"
+          }
+        }
+      ]
     },
     {
       "label": "vscode: watch with webview dev server",
