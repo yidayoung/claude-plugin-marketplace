@@ -1,0 +1,48 @@
+# Source files
+src/**
+tsconfig.json
+
+# Build files (keep out/)
+!out/**/*.js
+!out/**/*.js.map
+out/**/*.ts
+
+# Tests
+__tests__/**
+__mocks__/**
+jest.config.js
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+
+# Webview source (keep dist/)
+webview/src/**
+webview/tsconfig.json
+webview/vite.config.ts
+webview/package.json
+webview/package-lock.json
+webview/node_modules/**
+!webview/dist/**
+
+# Dependencies
+node_modules/**
+.vscode-extension/**
+
+# Development & configs
+.gitignore
+.eslintrc*
+.prettierrc*
+.vscode-test/**
+
+# Documentation (keep CHANGELOG.md for Marketplace)
+docs/**
+CLAUDE.md
+TESTING.md
+**/*.md
+!README.md
+!CHANGELOG.md
+
+# Misc
+*.vsix
+.DS_Store
+Thumbs.db
