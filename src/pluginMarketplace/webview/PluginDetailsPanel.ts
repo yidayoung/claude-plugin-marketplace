@@ -204,11 +204,11 @@ export class PluginDetailsPanel {
           try {
             const { pluginName, marketplace, scope } = message.payload;
             await this._dataStore.installPlugin(pluginName, marketplace, scope as 'user' | 'project');
-            vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 安装成功`);
+            vscode.window.showInformationMessage(vscode.l10n.t('plugin.installSuccess', pluginName));
             // 强制刷新详情面板（绕过缓存）
             await this.loadPluginDetail(this._pluginName, this._marketplace, true, true);
           } catch (error: any) {
-            vscode.window.showErrorMessage(`❌ 安装失败: ${error.message || '未知错误'}`);
+            vscode.window.showErrorMessage(vscode.l10n.t('plugin.installFailure', error.message || vscode.l10n.t('error.unknown')));
           }
           break;
         case 'uninstallPlugin':
@@ -216,11 +216,11 @@ export class PluginDetailsPanel {
           try {
             const { pluginName } = message.payload;
             await this._dataStore.uninstallPlugin(pluginName);
-            vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已卸载`);
+            vscode.window.showInformationMessage(vscode.l10n.t('plugin.uninstallSuccess', pluginName));
             // 事件系统会自动触发 UI 更新，但为了确保刷新，手动刷新一次
             await this.loadPluginDetail(this._pluginName, this._marketplace, false, true);
           } catch (error: any) {
-            vscode.window.showErrorMessage(`❌ 卸载失败: ${error.message || '未知错误'}`);
+            vscode.window.showErrorMessage(vscode.l10n.t('plugin.uninstallFailure', error.message || vscode.l10n.t('error.unknown')));
           }
           break;
         case 'enablePlugin':
@@ -228,11 +228,11 @@ export class PluginDetailsPanel {
           try {
             const { pluginName, marketplace } = message.payload;
             await this._dataStore.enablePlugin(pluginName, marketplace);
-            vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已启用`);
+            vscode.window.showInformationMessage(vscode.l10n.t('plugin.enableSuccess', pluginName));
             // 刷新详情面板
             await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled);
           } catch (error: any) {
-            vscode.window.showErrorMessage(`❌ 启用失败: ${error.message || '未知错误'}`);
+            vscode.window.showErrorMessage(vscode.l10n.t('plugin.enableFailure', error.message || vscode.l10n.t('error.unknown')));
           }
           break;
         case 'disablePlugin':
@@ -240,11 +240,11 @@ export class PluginDetailsPanel {
           try {
             const { pluginName, marketplace } = message.payload;
             await this._dataStore.disablePlugin(pluginName, marketplace);
-            vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已禁用`);
+            vscode.window.showInformationMessage(vscode.l10n.t('plugin.disableSuccess', pluginName));
             // 刷新详情面板
             await this.loadPluginDetail(this._pluginName, this._marketplace, this._isInstalled);
           } catch (error: any) {
-            vscode.window.showErrorMessage(`❌ 禁用失败: ${error.message || '未知错误'}`);
+            vscode.window.showErrorMessage(vscode.l10n.t('plugin.disableFailure', error.message || vscode.l10n.t('error.unknown')));
           }
           break;
         case 'openExternal':
@@ -266,17 +266,17 @@ export class PluginDetailsPanel {
           if (supportedPlatforms.includes(process.platform)) {
             await vscode.env.openExternal(directoryUri);
           } else {
-            vscode.window.showWarningMessage('不支持的操作系统');
+            vscode.window.showWarningMessage(vscode.l10n.t('os.unsupported'));
           }
           break;
         case 'copyToClipboard':
           await vscode.env.clipboard.writeText(message.payload.text);
-          vscode.window.showInformationMessage('已复制到剪贴板');
+          vscode.window.showInformationMessage(vscode.l10n.t('clipboard.copied'));
           break;
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      vscode.window.showErrorMessage(`操作失败: ${errorMsg}`);
+      vscode.window.showErrorMessage(vscode.l10n.t('operation.failure', errorMsg));
     }
   }
 

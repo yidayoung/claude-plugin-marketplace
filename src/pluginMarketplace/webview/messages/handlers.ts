@@ -204,15 +204,15 @@ export class MessageHandler {
             payload: { pluginName, scope }
           });
 
-          vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 安装成功`);
+          vscode.window.showInformationMessage(vscode.l10n.t('plugin.installSuccess', pluginName));
         } catch (error: any) {
-          const errorMessage = error.message || '未知错误';
+          const errorMessage = error.message || vscode.l10n.t('error.unknown');
           this.sendMessage({
             type: 'installError',
             payload: { pluginName, error: errorMessage }
           });
 
-          vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 安装失败: ${errorMessage}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('plugin.installFailureWithName', pluginName, errorMessage));
           throw error;
         }
       }
@@ -228,13 +228,13 @@ export class MessageHandler {
 
     // 显示确认对话框
     const confirm = await vscode.window.showWarningMessage(
-      `确定要卸载插件 ${pluginName} 吗？`,
+      vscode.l10n.t('plugin.uninstallConfirm', pluginName),
       { modal: true },
-      '确定',
-      '取消'
+      vscode.l10n.t('confirm'),
+      vscode.l10n.t('cancel')
     );
 
-    if (confirm !== '确定') {
+    if (confirm !== vscode.l10n.t('confirm')) {
       return;
     }
 
@@ -254,15 +254,15 @@ export class MessageHandler {
             payload: { pluginName }
           });
 
-          vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 卸载成功`);
+          vscode.window.showInformationMessage(vscode.l10n.t('plugin.uninstallSuccess', pluginName));
         } catch (error: any) {
-          const errorMessage = error.message || '未知错误';
+          const errorMessage = error.message || vscode.l10n.t('error.unknown');
           this.sendMessage({
             type: 'uninstallError',
             payload: { pluginName, error: errorMessage }
           });
 
-          vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 卸载失败: ${errorMessage}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('plugin.uninstallFailureWithName', pluginName, errorMessage));
           throw error;
         }
       }
@@ -284,15 +284,15 @@ export class MessageHandler {
         payload: { pluginName, marketplace }
       });
 
-      vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已启用`);
+      vscode.window.showInformationMessage(vscode.l10n.t('plugin.enableSuccess', pluginName));
     } catch (error: any) {
-      const errorMessage = error.message || '未知错误';
+      const errorMessage = error.message || vscode.l10n.t('error.unknown');
       this.sendMessage({
         type: 'enableError',
         payload: { pluginName, error: errorMessage }
       });
 
-      vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 启用失败: ${errorMessage}`);
+      vscode.window.showErrorMessage(vscode.l10n.t('plugin.enableFailureWithName', pluginName, errorMessage));
     }
   }
 
@@ -311,15 +311,15 @@ export class MessageHandler {
         payload: { pluginName, marketplace }
       });
 
-      vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已禁用`);
+      vscode.window.showInformationMessage(vscode.l10n.t('plugin.disableSuccess', pluginName));
     } catch (error: any) {
-      const errorMessage = error.message || '未知错误';
+      const errorMessage = error.message || vscode.l10n.t('error.unknown');
       this.sendMessage({
         type: 'disableError',
         payload: { pluginName, error: errorMessage }
       });
 
-      vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 禁用失败: ${errorMessage}`);
+      vscode.window.showErrorMessage(vscode.l10n.t('plugin.disableFailureWithName', pluginName, errorMessage));
     }
   }
 
@@ -347,23 +347,23 @@ export class MessageHandler {
               payload: { action: 'add', source, name: result.marketplaceName }
             });
 
-            vscode.window.showInformationMessage(`✅ 市场 ${result.marketplaceName || source} 添加成功`);
+            vscode.window.showInformationMessage(vscode.l10n.t('marketplace.addSuccess', result.marketplaceName || source));
           } else {
             this.sendMessage({
               type: 'marketplaceError',
-              payload: { action: 'add', error: result.error || '添加失败' }
+              payload: { action: 'add', error: result.error || vscode.l10n.t('marketplace.addFailure', '') }
             });
 
-            vscode.window.showErrorMessage(`❌ 市场 ${source} 添加失败: ${result.error}`);
+            vscode.window.showErrorMessage(vscode.l10n.t('marketplace.addFailureWithName', source, result.error ?? ''));
           }
         } catch (error: any) {
-          const errorMessage = error.message || '未知错误';
+          const errorMessage = error.message || vscode.l10n.t('error.unknown');
           this.sendMessage({
             type: 'marketplaceError',
             payload: { action: 'add', error: errorMessage }
           });
 
-          vscode.window.showErrorMessage(`❌ 市场 ${source} 添加失败: ${errorMessage}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('marketplace.addFailureWithName', source, errorMessage));
         }
       }
     );
@@ -378,13 +378,13 @@ export class MessageHandler {
 
     // 显示确认对话框
     const confirm = await vscode.window.showWarningMessage(
-      `确定要删除市场 ${name} 吗？`,
+      vscode.l10n.t('marketplace.removeConfirm', name),
       { modal: true },
-      '确定',
-      '取消'
+      vscode.l10n.t('confirm'),
+      vscode.l10n.t('cancel')
     );
 
-    if (confirm !== '确定') {
+    if (confirm !== vscode.l10n.t('confirm')) {
       return;
     }
 
@@ -405,23 +405,23 @@ export class MessageHandler {
               payload: { action: 'remove', name }
             });
 
-            vscode.window.showInformationMessage(`✅ 市场 ${name} 删除成功`);
+            vscode.window.showInformationMessage(vscode.l10n.t('marketplace.removeSuccess', name));
           } else {
             this.sendMessage({
               type: 'marketplaceError',
-              payload: { action: 'remove', error: result.error || '删除失败' }
+              payload: { action: 'remove', error: result.error || vscode.l10n.t('marketplace.removeFailure', '') }
             });
 
-            vscode.window.showErrorMessage(`❌ 市场 ${name} 删除失败: ${result.error}`);
+            vscode.window.showErrorMessage(vscode.l10n.t('marketplace.removeFailureWithName', name, result.error ?? ''));
           }
         } catch (error: any) {
-          const errorMessage = error.message || '未知错误';
+          const errorMessage = error.message || vscode.l10n.t('error.unknown');
           this.sendMessage({
             type: 'marketplaceError',
             payload: { action: 'remove', error: errorMessage }
           });
 
-          vscode.window.showErrorMessage(`❌ 市场 ${name} 删除失败: ${errorMessage}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('marketplace.removeFailureWithName', name, errorMessage));
         }
       }
     );
@@ -451,23 +451,23 @@ export class MessageHandler {
               payload: { action: 'update', name }
             });
 
-            vscode.window.showInformationMessage(`✅ 市场 ${name} 更新成功`);
+            vscode.window.showInformationMessage(vscode.l10n.t('marketplace.updateSuccess', name));
           } else {
             this.sendMessage({
               type: 'marketplaceError',
-              payload: { action: 'update', error: result.error || '更新失败' }
+              payload: { action: 'update', error: result.error || vscode.l10n.t('marketplace.updateFailure', '') }
             });
 
-            vscode.window.showErrorMessage(`❌ 市场 ${name} 更新失败: ${result.error}`);
+            vscode.window.showErrorMessage(vscode.l10n.t('marketplace.updateFailureWithName', name, result.error ?? ''));
           }
         } catch (error: any) {
-          const errorMessage = error.message || '未知错误';
+          const errorMessage = error.message || vscode.l10n.t('error.unknown');
           this.sendMessage({
             type: 'marketplaceError',
             payload: { action: 'update', error: errorMessage }
           });
 
-          vscode.window.showErrorMessage(`❌ 市场 ${name} 更新失败: ${errorMessage}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('marketplace.updateFailureWithName', name, errorMessage));
         }
       }
     );
@@ -515,15 +515,15 @@ export class MessageHandler {
             payload: { pluginName, scope: 'user' }
           });
 
-          vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 更新成功`);
+          vscode.window.showInformationMessage(vscode.l10n.t('plugin.updateSuccess', pluginName));
         } catch (error: any) {
-          const errorMessage = error.message || '未知错误';
+          const errorMessage = error.message || vscode.l10n.t('error.unknown');
           this.sendMessage({
             type: 'installError',
             payload: { pluginName, error: errorMessage }
           });
 
-          vscode.window.showErrorMessage(`❌ 插件 ${pluginName} 更新失败: ${errorMessage}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('plugin.updateFailureWithName', pluginName, errorMessage));
           throw error;
         }
       }
@@ -538,7 +538,7 @@ export class MessageHandler {
     const { pluginName, marketplace } = payload;
 
     if (!this.extensionUri) {
-      vscode.window.showErrorMessage('无法打开详情页：缺少扩展 URI');
+      vscode.window.showErrorMessage(vscode.l10n.t('detail.openNoUri'));
       return;
     }
 
@@ -554,7 +554,7 @@ export class MessageHandler {
       // 获取扩展上下文
       const context = this.dataStore.getContext();
       if (!context) {
-        vscode.window.showErrorMessage('无法打开详情页：缺少扩展上下文');
+        vscode.window.showErrorMessage(vscode.l10n.t('detail.openNoContext'));
         return;
       }
 
@@ -569,7 +569,7 @@ export class MessageHandler {
       );
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      vscode.window.showErrorMessage(`打开插件详情失败: ${errorMsg}`);
+      vscode.window.showErrorMessage(vscode.l10n.t('detail.openFailure', errorMsg));
     }
   }
 

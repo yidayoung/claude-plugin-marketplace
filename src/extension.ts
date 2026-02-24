@@ -22,8 +22,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   if (!workspaceRoot) {
     console.warn('[Claude Plugin Marketplace] No workspace folder found');
     vscode.window.showWarningMessage(
-      'Claude Plugin Marketplace: Please open a workspace folder to use the Plugin Marketplace',
-      'OK'
+      vscode.l10n.t('workspace.openFolder'),
+      vscode.l10n.t('workspace.ok')
     );
   }
 
@@ -51,10 +51,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   dataStore.checkClaudeInstalled().then((installed: boolean) => {
     if (!installed) {
       vscode.window.showWarningMessage(
-        '未检测到 Claude Code CLI，插件市场功能将不可用。请安装 Claude Code: https://claude.ai/download',
-        '下载'
+        vscode.l10n.t('cli.notInstalled'),
+        vscode.l10n.t('cli.download')
       ).then(action => {
-        if (action === '下载') {
+        if (action === vscode.l10n.t('cli.download')) {
           vscode.env.openExternal(vscode.Uri.parse('https://claude.ai/download'));
         }
       });
@@ -98,17 +98,17 @@ function registerPluginMarketplaceCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand('claudePluginMarketplace.addMarketplace', async () => {
       const source = await vscode.window.showInputBox({
-        prompt: '输入市场来源',
-        placeHolder: 'owner/repo 或 https://github.com/owner/repo',
+        prompt: vscode.l10n.t('marketplace.addSourcePrompt'),
+        placeHolder: vscode.l10n.t('marketplace.addSourcePlaceholder'),
         value: ''
       });
 
       if (source) {
         const result = await dataStore.addMarketplace(source);
         if (result.success) {
-          vscode.window.showInformationMessage(`✅ 市场 ${result.marketplaceName || source} 添加成功`);
+          vscode.window.showInformationMessage(vscode.l10n.t('marketplace.addSuccess', result.marketplaceName || source));
         } else {
-          vscode.window.showErrorMessage(`❌ 添加市场失败: ${result.error}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('marketplace.addFailure', result.error ?? ''));
         }
       }
     })
@@ -122,18 +122,18 @@ function registerPluginMarketplaceCommands(
     }
 
     const confirm = await vscode.window.showWarningMessage(
-      `确认删除市场 "${marketplaceName}"?`,
+      vscode.l10n.t('marketplace.removeConfirm', marketplaceName),
       { modal: true },
-      '确认',
-      '取消'
+      vscode.l10n.t('confirm'),
+      vscode.l10n.t('cancel')
     );
 
-    if (confirm === '确认') {
+    if (confirm === vscode.l10n.t('confirm')) {
       const result = await dataStore.removeMarketplace(marketplaceName);
       if (result.success) {
-        vscode.window.showInformationMessage(`✅ 市场 ${marketplaceName} 删除成功`);
+        vscode.window.showInformationMessage(vscode.l10n.t('marketplace.removeSuccess', marketplaceName));
       } else {
-        vscode.window.showErrorMessage(`❌ 删除市场失败: ${result.error}`);
+        vscode.window.showErrorMessage(vscode.l10n.t('marketplace.removeFailure', result.error ?? ''));
       }
     }
   })
@@ -148,9 +148,9 @@ function registerPluginMarketplaceCommands(
 
       const result = await dataStore.updateMarketplace(marketplaceName);
       if (result.success) {
-        vscode.window.showInformationMessage(`✅ 市场 ${marketplaceName} 更新成功`);
+        vscode.window.showInformationMessage(vscode.l10n.t('marketplace.updateSuccess', marketplaceName));
       } else {
-        vscode.window.showErrorMessage(`❌ 更新市场失败: ${result.error}`);
+        vscode.window.showErrorMessage(vscode.l10n.t('marketplace.updateFailure', result.error ?? ''));
       }
     })
   );
@@ -165,22 +165,21 @@ function registerPluginMarketplaceCommands(
         return;
       }
 
-      // 选择安装范围
       const scopeItems = [
-        { label: 'user', description: '当前用户的所有项目' },
-        { label: 'project', description: '当前项目' },
-        { label: 'local', description: '仅当前工作区' }
+        { label: 'user', description: vscode.l10n.t('install.scopeUser') },
+        { label: 'project', description: vscode.l10n.t('install.scopeProject') },
+        { label: 'local', description: vscode.l10n.t('install.scopeLocal') }
       ] as const;
       const scope = await vscode.window.showQuickPick(scopeItems, {
-        placeHolder: '选择安装范围'
+        placeHolder: vscode.l10n.t('install.scopePlaceholder')
       });
 
       if (scope) {
         try {
           await dataStore.installPlugin(pluginName, marketplaceName, scope.label as PluginScope);
-          vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 安装成功`);
+          vscode.window.showInformationMessage(vscode.l10n.t('plugin.installSuccess', pluginName));
         } catch (error: any) {
-          vscode.window.showErrorMessage(`❌ 安装失败: ${error.message || '未知错误'}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('plugin.installFailure', error.message || vscode.l10n.t('error.unknown')));
         }
       }
     })
@@ -196,18 +195,18 @@ function registerPluginMarketplaceCommands(
       }
 
       const confirm = await vscode.window.showWarningMessage(
-        `确认卸载插件 "${pluginName}"?`,
+        vscode.l10n.t('plugin.uninstallConfirm', pluginName),
         { modal: true },
-        '确认',
-        '取消'
+        vscode.l10n.t('confirm'),
+        vscode.l10n.t('cancel')
       );
 
-      if (confirm === '确认') {
+      if (confirm === vscode.l10n.t('confirm')) {
         try {
           await dataStore.uninstallPlugin(pluginName);
-          vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 卸载成功`);
+          vscode.window.showInformationMessage(vscode.l10n.t('plugin.uninstallSuccess', pluginName));
         } catch (error: any) {
-          vscode.window.showErrorMessage(`❌ 卸载失败: ${error.message || '未知错误'}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('plugin.uninstallFailure', error.message || vscode.l10n.t('error.unknown')));
         }
       }
     })
@@ -225,9 +224,9 @@ function registerPluginMarketplaceCommands(
 
       try {
         await dataStore.enablePlugin(pluginName, marketplaceName);
-        vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已启用`);
+        vscode.window.showInformationMessage(vscode.l10n.t('plugin.enableSuccess', pluginName));
       } catch (error: any) {
-        vscode.window.showErrorMessage(`❌ 启用失败: ${error.message || '未知错误'}`);
+        vscode.window.showErrorMessage(vscode.l10n.t('plugin.enableFailure', error.message || vscode.l10n.t('error.unknown')));
       }
     })
   );
@@ -244,9 +243,9 @@ function registerPluginMarketplaceCommands(
 
       try {
         await dataStore.disablePlugin(pluginName, marketplaceName);
-        vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 已禁用`);
+        vscode.window.showInformationMessage(vscode.l10n.t('plugin.disableSuccess', pluginName));
       } catch (error: any) {
-        vscode.window.showErrorMessage(`❌ 禁用失败: ${error.message || '未知错误'}`);
+        vscode.window.showErrorMessage(vscode.l10n.t('plugin.disableFailure', error.message || vscode.l10n.t('error.unknown')));
       }
     })
   );
@@ -262,12 +261,11 @@ function registerPluginMarketplaceCommands(
       }
 
       try {
-        // 先卸载再安装
         await dataStore.uninstallPlugin(pluginName);
         await dataStore.installPlugin(pluginName, marketplaceName, 'user');
-        vscode.window.showInformationMessage(`✅ 插件 ${pluginName} 更新成功`);
+        vscode.window.showInformationMessage(vscode.l10n.t('plugin.updateSuccess', pluginName));
       } catch (error: any) {
-        vscode.window.showErrorMessage(`❌ 更新失败: ${error.message || '未知错误'}`);
+        vscode.window.showErrorMessage(vscode.l10n.t('plugin.updateFailure', error.message || vscode.l10n.t('error.unknown')));
       }
     })
   );
