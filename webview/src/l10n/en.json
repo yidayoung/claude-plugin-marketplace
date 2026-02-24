@@ -54,5 +54,11 @@
   "item.disable": "Disable",
   "item.update": "Update",
   "item.uninstall": "Uninstall",
-  "item.actions": "Actions"
+  "item.actions": "Actions",
+  "marketplace.discover.title": "Discover Marketplaces",
+  "marketplace.discover.addCustom": "Add Custom Marketplace",
+  "marketplace.discover.inputPlaceholder": "owner/repo or URL",
+  "marketplace.discover.addButton": "Add",
+  "marketplace.discover.recommended": "Recommended Marketplaces",
+  "marketplace.discover.addedButton": "Added"
 }

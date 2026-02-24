@@ -54,5 +54,11 @@
   "item.disable": "禁用",
   "item.update": "更新",
   "item.uninstall": "卸载",
-  "item.actions": "操作"
+  "item.actions": "操作",
+  "marketplace.discover.title": "发现市场",
+  "marketplace.discover.addCustom": "添加自定义市场",
+  "marketplace.discover.inputPlaceholder": "owner/repo 或 URL",
+  "marketplace.discover.addButton": "添加",
+  "marketplace.discover.recommended": "推荐市场",
+  "marketplace.discover.addedButton": "已添加"
 }

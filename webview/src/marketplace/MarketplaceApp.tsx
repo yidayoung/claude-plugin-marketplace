@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Input, Button, Divider, Typography, Space, Card, message } from 'antd';
 import { AppstoreOutlined, PlusOutlined } from '@ant-design/icons';
+import { useL10n } from '@/l10n';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -33,10 +34,6 @@ const RECOMMENDED_MARKETPLACES = [
   }
 ];
 
-interface MarketplaceAppProps {
-  t: Record<string, string>;
-}
-
 interface MarketplaceListMessage {
   type: 'marketplaceList';
   payload: {
@@ -44,7 +41,8 @@ interface MarketplaceListMessage {
   };
 }
 
-const MarketplaceApp: React.FC<MarketplaceAppProps> = ({ t }) => {
+const MarketplaceApp: React.FC = () => {
+  const { t } = useL10n();
   const [inputValue, setInputValue] = useState('');
   const [addedMarketplaces, setAddedMarketplaces] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -66,7 +64,7 @@ const MarketplaceApp: React.FC<MarketplaceAppProps> = ({ t }) => {
   const handleAddMarketplace = () => {
     const source = inputValue.trim();
     if (!source) {
-      message.warning(t['marketplace.discover.inputPlaceholder'] || '请输入市场来源');
+      message.warning(t('marketplace.discover.inputPlaceholder'));
       return;
     }
 
@@ -102,18 +100,18 @@ const MarketplaceApp: React.FC<MarketplaceAppProps> = ({ t }) => {
       <div style={{ marginBottom: '24px' }}>
         <Title level={3} style={{ margin: 0 }}>
           <AppstoreOutlined style={{ marginRight: '8px' }} />
-          {t['marketplace.discover.title'] || '发现市场'}
+          {t('marketplace.discover.title')}
         </Title>
       </div>
 
       {/* 自定义市场添加 */}
       <Card
-        title={t['marketplace.discover.addCustom'] || '添加自定义市场'}
+        title={t('marketplace.discover.addCustom')}
         style={{ marginBottom: '24px' }}
       >
         <Space.Compact style={{ width: '100%' }}>
           <Input
-            placeholder={t['marketplace.discover.inputPlaceholder'] || 'owner/repo 或 URL'}
+            placeholder={t('marketplace.discover.inputPlaceholder')}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onPressEnter={handleAddMarketplace}
@@ -124,7 +122,7 @@ const MarketplaceApp: React.FC<MarketplaceAppProps> = ({ t }) => {
             onClick={handleAddMarketplace}
             loading={loading}
           >
-            {t['marketplace.discover.addButton'] || '添加'}
+            {t('marketplace.discover.addButton')}
           </Button>
         </Space.Compact>
       </Card>
@@ -134,7 +132,7 @@ const MarketplaceApp: React.FC<MarketplaceAppProps> = ({ t }) => {
       {/* 推荐市场 */}
       <div>
         <Title level={4} style={{ marginBottom: '16px' }}>
-          {t['marketplace.discover.recommended'] || '推荐市场'}
+          {t('marketplace.discover.recommended')}
         </Title>
 
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -153,8 +151,8 @@ const MarketplaceApp: React.FC<MarketplaceAppProps> = ({ t }) => {
                     onClick={() => handleAddRecommended(marketplace.source)}
                   >
                     {isAdded
-                      ? (t['marketplace.discover.addedButton'] || '已添加')
-                      : (t['marketplace.discover.addButton'] || '添加')
+                      ? t('marketplace.discover.addedButton')
+                      : t('marketplace.discover.addButton')
                     }
                   </Button>
                 }
