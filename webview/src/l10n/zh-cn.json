@@ -60,5 +60,9 @@
   "marketplace.discover.inputPlaceholder": "owner/repo 或 URL",
   "marketplace.discover.addButton": "添加",
   "marketplace.discover.recommended": "推荐市场",
-  "marketplace.discover.addedButton": "已添加"
+  "marketplace.discover.addedButton": "已添加",
+  "marketplace.discover.featured": "精选",
+  "marketplace.discover.subtitle": "探索优质插件市场，扩展 Claude Code 的能力",
+  "marketplace.discover.featuredMarkets": "精选市场",
+  "marketplace.discover.allMarkets": "全部市场"
 }
