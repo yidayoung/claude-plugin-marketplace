@@ -72,6 +72,28 @@ Content here`;
       expect(result?.description).toBe('A simple test skill');
     });
 
+    it('应解析多行缩进的 description 格式', () => {
+      const content = `---
+name: code-reviewer
+description:
+  使用此skill进行代码审查。支持本地更改（暂存区或工作区）
+  重点关注正确性、可维护性以及是否符合项目规范。
+---
+
+# Code Reviewer
+
+此技能指导代理对本地开发和进行专业、全面的代码审查。`;
+
+      const result = parseFrontmatter(content);
+
+      expect(result).not.toBeNull();
+      expect(result?.name).toBe('code-reviewer');
+      expect(result?.description).toContain('使用此skill进行代码审查');
+      expect(result?.description).toContain('重点关注正确性');
+      // 确保是字符串类型
+      expect(typeof result?.description).toBe('string');
+    });
+
     it('应处理没有 frontmatter 的内容', () => {
       const content = `Just some content without frontmatter`;
 

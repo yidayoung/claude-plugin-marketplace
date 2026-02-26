@@ -11,87 +11,82 @@ export interface RepositoryInfo {
 
 /**
  * 解析 Markdown frontmatter
- * 使用宽松的解析模式，处理包含特殊字符（如冒号）的值
+ * 宽松解析模式：
+ * - 行首匹配 `key: value` 格式的为键值对
+ * - 其他行作为上一个键的多行内容
  */
 export function parseFrontmatter(content: string): Record<string, any> | null {
   const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!frontmatterMatch) return null;
 
   const frontmatterText = frontmatterMatch[1];
-
-  // 首先尝试标准 YAML 解析
-  try {
-    const yaml = require('yaml');
-    return yaml.parse(frontmatterText);
-  } catch (e) {
-    // YAML 解析失败，使用宽松的正则表达式解析
-    // 这种情况通常发生在值中包含冒号等特殊字符时
-  }
-
-  // 宽松解析：逐行解析键值对
-  const result: Record<string, any> = {};
   const lines = frontmatterText.split('\n');
+  const result: Record<string, any> = {};
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  let currentKey: string | null = null;
+  let currentValue: string[] = [];
+
+  for (const line of lines) {
     const trimmed = line.trim();
 
-    // 跳过空行和注释
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    // 查找第一个冒号作为键值分隔符
-    const colonIndex = trimmed.indexOf(':');
-    if (colonIndex === -1) continue;
-
-    const key = trimmed.substring(0, colonIndex).trim();
-    let value = trimmed.substring(colonIndex + 1).trim();
-
-    // 处理不同类型的值
-    if (!value) {
-      // 空值
-      result[key] = null;
-    } else if (value.startsWith('"') || value.startsWith("'")) {
-      // 字符串值（引号包围）
-      result[key] = value.slice(1, -1);
-    } else if (value === 'true') {
-      result[key] = true;
-    } else if (value === 'false') {
-      result[key] = false;
-    } else if (value === 'null') {
-      result[key] = null;
-    } else if (!isNaN(Number(value))) {
-      // 数字值
-      result[key] = Number(value);
-    } else if (value.startsWith('[')) {
-      // 数组值 - 简单处理
-      try {
-        result[key] = JSON.parse(value);
-      } catch {
-        // 如果解析失败，保留原始字符串
-        result[key] = value;
+    // 跳过空行
+    if (!trimmed) {
+      // 如果当前有 key，保留空行
+      if (currentKey) {
+        currentValue.push('');
       }
-    } else if (value.startsWith('{')) {
-      // 对象值 - 简单处理
-      try {
-        result[key] = JSON.parse(value);
-      } catch {
-        // 如果解析失败，保留原始字符串
-        result[key] = value;
+      continue;
+    }
+
+    // 检查是否是键值对：行首非缩进的 `key:` 格式
+    const keyValueMatch = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)?$/);
+
+    if (keyValueMatch) {
+      // 保存之前的键值对
+      if (currentKey) {
+        result[currentKey] = parseValue(currentValue.join('\n').trim());
       }
+
+      // 开始新的键值对
+      currentKey = keyValueMatch[1];
+      const inlineValue = keyValueMatch[2] || '';
+      currentValue = inlineValue ? [inlineValue] : [];
     } else {
-      // 多行字符串值：检查后续行是否缩进
-      let fullValue = value;
-      let j = i + 1;
-      while (j < lines.length && (lines[j].startsWith('  ') || lines[j].startsWith('\t'))) {
-        fullValue += '\n' + lines[j].trimLeft();
-        j++;
+      // 多行内容，追加到当前键
+      if (currentKey) {
+        // 去掉行首缩进（保留相对缩进结构）
+        const indentMatch = line.match(/^(\s*)/);
+        const indent = indentMatch ? indentMatch[1] : '';
+        const trimmedLine = line.substring(indent.length - Math.min(2, indent.length));
+        currentValue.push(trimmedLine);
       }
-      i = j - 1; // 跳过已处理的行
-      result[key] = fullValue;
     }
   }
 
+  // 保存最后一个键值对
+  if (currentKey) {
+    result[currentKey] = parseValue(currentValue.join('\n').trim());
+  }
+
   return Object.keys(result).length > 0 ? result : null;
+}
+
+/**
+ * 解析值 - 统一返回字符串
+ */
+function parseValue(value: string): string {
+  if (!value) return '';
+
+  // 去掉首尾空行
+  value = value.replace(/^\n+|\n+$/g, '');
+
+  // 去掉引号包裹
+  if ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))) {
+    return value.slice(1, -1);
+  }
+
+  return value;
 }
 
 /**
