@@ -180,7 +180,7 @@ const SidebarApp: React.FC = () => {
                 </PluginSection>
               )}
 
-              {Object.keys(groupedPlugins.byMarketplace).map(marketName => {
+              {Object.keys(groupedPlugins.byMarketplace).sort((a, b) => a.localeCompare(b)).map(marketName => {
                 const plugins = groupedPlugins.byMarketplace[marketName];
                 return (
                   <PluginSection
