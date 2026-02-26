@@ -63,3 +63,6 @@ webview/node_modules/
 .cache/
 .parcel-cache/
 webview-app/node_modules
+
+# claude local
+.claude/settings.local.json
