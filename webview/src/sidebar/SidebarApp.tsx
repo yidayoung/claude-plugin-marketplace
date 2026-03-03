@@ -1,24 +1,12 @@
-// vscode-extension/webview/src/sidebar/SidebarApp.tsx
-
 import { useState } from 'react';
-import { Input, Spin, Empty, Alert, Button, Divider, Typography, Flex, Dropdown } from 'antd';
-import {
-  SearchOutlined,
-  CheckCircleOutlined,
-  ReloadOutlined,
-  MoreOutlined,
-  AppstoreOutlined,
-  SyncOutlined
-} from '@ant-design/icons';
-import type { MenuProps } from 'antd';
-
+import { Search, CheckCircle2, RefreshCw, MoreVertical, Store, Sync, XCircle } from 'lucide-react';
+import { cn } from '../lib/cn';
+import { Input, Button } from '../components';
 import { usePluginData, usePluginFilter, useHoverState } from '../hooks';
 import { PluginItem, PluginSection, MarketSectionActions } from '../components';
 import { useL10n } from '../l10n';
 
-const { Text } = Typography;
-
-// 声明全局 vscode API（由外部 HTML 注入）
+// 声明全局 vscode API
 declare const vscode: {
   postMessage: (message: any) => void;
   getState: () => any;
@@ -30,7 +18,9 @@ const SidebarApp: React.FC = () => {
   const { state, loadPlugins, setState } = usePluginData();
   const { groupedPlugins, stats } = usePluginFilter(state.plugins, state.filter);
   const { isHovered, setHovered } = useHoverState();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['installed', 'available']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(['installed', 'available'])
+  );
 
   const handleSearch = (keyword: string) => {
     setState(prev => ({
@@ -53,163 +43,134 @@ const SidebarApp: React.FC = () => {
 
   if (state.loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <Spin size="small" tip={t('sidebar.loading')} />
+      <div className="flex items-center justify-center p-6">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          <span className="text-sm">{t('sidebar.loading')}</span>
+        </div>
       </div>
     );
   }
 
   if (state.error) {
     return (
-      <div style={{ padding: 8 }}>
-        <Alert
-          type="error"
-          message={state.error}
-          showIcon
-          closable
-        />
+      <div className="p-2">
+        <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20">
+          <div className="flex items-center gap-2 text-destructive text-sm">
+            <XCircle className="w-4 h-4" />
+            <span>{state.error}</span>
+          </div>
+        </div>
       </div>
     );
   }
 
-  // 设置菜单项
-  const settingsMenuItems: MenuProps['items'] = [
-    {
-      key: 'refresh',
-      label: t('sidebar.refresh'),
-      icon: <ReloadOutlined />,
-      onClick: loadPlugins
-    },
-    {
-      key: 'addMarketplace',
-      label: t('sidebar.addMarketplace'),
-      icon: <AppstoreOutlined />,
-      onClick: () => {
-        vscode.postMessage({
-          type: 'executeCommand',
-          payload: { command: 'claudePluginMarketplace.addMarketplace' }
-        });
-      }
-    },
-    {
-      type: 'divider'
-    },
-    {
-      key: 'updateAll',
-      label: t('sidebar.updateAll'),
-      icon: <SyncOutlined />,
-      onClick: () => {
-        state.plugins.filter(p => p.updateAvailable).forEach(p => {
-          vscode.postMessage({
-            type: 'updatePlugin',
-            payload: { pluginName: p.name, marketplace: p.marketplace }
-          });
-        });
-      }
-    }
-  ];
-
   return (
-    <>
-      <Flex vertical style={{ height: '100%', overflow: 'hidden' }}>
-        {/* 搜索栏 + 设置按钮 */}
-        <Flex align="center" gap={4} style={{ padding: '6px 8px' }}>
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="p-3 border-b border-border">
+        {/* Search */}
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder={t('sidebar.searchPlaceholder')}
             value={state.filter.keyword}
             onChange={(e) => handleSearch(e.target.value)}
-            prefix={<SearchOutlined />}
-            allowClear
-            size="small"
-            style={{ flex: 1 }}
+            className="pl-9"
           />
-          <Dropdown menu={{ items: settingsMenuItems }} trigger={['click']} placement="bottomRight">
-            <Button
-              type="text"
-              size="small"
-              icon={<MoreOutlined />}
-              title={t('sidebar.moreActions')}
-              style={{ width: 28, height: 28, padding: 0 }}
-            />
-          </Dropdown>
-        </Flex>
-
-        {/* 统计信息 */}
-        <Flex justify="space-between" style={{ padding: '0 8px' }}>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            <CheckCircleOutlined style={{ marginRight: 4 }} />
-            {t('sidebar.installedEnabled', String(stats.installed), String(stats.enabled))}
-          </Text>
-          {stats.updatable > 0 && (
-            <Text style={{ fontSize: 11, color: '#faad14' }}>
-              <SyncOutlined style={{ marginRight: 4 }} />
-              {t('sidebar.updatableCount', String(stats.updatable))}
-            </Text>
-          )}
-        </Flex>
-
-        <Divider style={{ margin: '8px 0' }} />
-
-        {/* 插件列表 */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
-          {groupedPlugins.installed.length === 0 && Object.keys(groupedPlugins.byMarketplace).length === 0 ? (
-            <Empty
-              description={state.filter.keyword ? t('sidebar.noMatch') : t('sidebar.noPlugins')}
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
-          ) : (
-            <>
-              {groupedPlugins.installed.length > 0 && (
-                <PluginSection
-                  title={t('sidebar.installed')}
-                  count={groupedPlugins.installed.length}
-                  sectionKey="installed"
-                  isExpanded={expandedSections.has('installed')}
-                  isHovered={isHovered('section-installed')}
-                  onToggle={toggleSection}
-                  onHoverChange={setHovered}
-                >
-                  {groupedPlugins.installed.map(plugin => (
-                    <PluginItem
-                      key={plugin.name}
-                      plugin={plugin}
-                      isHovered={isHovered(`plugin-${plugin.name}`)}
-                      onHoverChange={setHovered}
-                    />
-                  ))}
-                </PluginSection>
-              )}
-
-              {Object.keys(groupedPlugins.byMarketplace).sort((a, b) => a.localeCompare(b)).map(marketName => {
-                const plugins = groupedPlugins.byMarketplace[marketName];
-                return (
-                  <PluginSection
-                    key={marketName}
-                    title={marketName}
-                    count={plugins.length}
-                    sectionKey={`market-${marketName}`}
-                    isExpanded={expandedSections.has(`market-${marketName}`)}
-                    isHovered={isHovered(`section-market-${marketName}`)}
-                    onToggle={toggleSection}
-                    onHoverChange={setHovered}
-                    actions={<MarketSectionActions marketName={marketName} />}
-                  >
-                    {plugins.map(plugin => (
-                      <PluginItem
-                        key={plugin.name}
-                        plugin={plugin}
-                        isHovered={isHovered(`plugin-${plugin.name}`)}
-                        onHoverChange={setHovered}
-                      />
-                    ))}
-                  </PluginSection>
-                );
-              })}
-            </>
-          )}
         </div>
-      </Flex>
-    </>
+
+        {/* Stats & Actions */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span>{t('sidebar.installed')}: {stats.installed}</span>
+            <span>{t('sidebar.available')}: {stats.available}</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={loadPlugins}
+              title={t('sidebar.refresh')}
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                vscode.postMessage({
+                  type: 'executeCommand',
+                  payload: { command: 'claudePluginMarketplace.addMarketplace' }
+                });
+              }}
+              title={t('sidebar.addMarketplace')}
+            >
+              <Store className="w-4 h-4" />
+            </Button>
+
+            {state.plugins.some(p => p.updateAvailable) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  // Update all logic
+                  state.plugins
+                    .filter(p => p.updateAvailable)
+                    .forEach(p => {
+                      vscode.postMessage({
+                        type: 'updatePlugin',
+                        payload: { pluginName: p.name, marketplace: p.marketplace }
+                      });
+                    });
+                }}
+                title={t('sidebar.updateAll')}
+              >
+                <Sync className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Plugin List */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-4">
+        {groupedPlugins.map(([marketplace, plugins]) => {
+          const sectionId = `${marketplace}-section`;
+          const isExpanded = expandedSections.has(sectionId);
+          const installedCount = plugins.filter(p => p.installed).length;
+
+          return (
+            <PluginSection
+              key={marketplace}
+              id={sectionId}
+              title={marketplace}
+              count={installedCount}
+              expanded={isExpanded}
+              onToggle={() => toggleSection(sectionId)}
+            >
+              {plugins.map(plugin => (
+                <PluginItem
+                  key={`${plugin.marketplace}-${plugin.name}`}
+                  plugin={plugin}
+                  isHovered={isHovered(plugin.name)}
+                  onHoverChange={setHovered}
+                />
+              ))}
+            </PluginSection>
+          );
+        })}
+
+        {groupedPlugins.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Store className="w-12 h-12 mb-3 opacity-50" />
+            <p className="text-sm">{t('sidebar.noResults')}</p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
