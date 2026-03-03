@@ -1,39 +1,28 @@
-// vscode-extension/webview/src/details/DetailContent.tsx
-
-import React from 'react';
-
+import { FileText } from 'lucide-react';
+import { Badge } from '../components';
 import { useL10n } from '../l10n';
-
 import type { PluginDetailData } from './DetailsApp';
 import ComponentsSection from './ComponentsSection';
 import ReadmeSection from './ReadmeSection';
-
-const { Title, Paragraph, Text } = Typography;
 
 interface DetailContentProps {
   plugin: PluginDetailData;
   onOpenFile: (filePath: string) => void;
 }
 
-const DetailContent: React.FC<DetailContentProps> = ({ plugin, onOpenFile }) => {
+export default function DetailContent({ plugin, onOpenFile }: DetailContentProps) {
   const { t } = useL10n();
+
   return (
-    <Space direction="vertical" size={24} style={{ width: '100%' }}>
+    <div className="space-y-6">
       {plugin.description && (
-        <Space direction="vertical" size={12} style={{
-          padding: 16,
-          background: 'var(--vscode-sideBar-background)',
-          borderRadius: 8,
-          border: '1px solid var(--vscode-panel-border)',
-          width: '100%'
-        }}>
-          <Title level={5} style={{ margin: 0 }}>
-            <FileTextOutlined /> {t('content.description')}
-          </Title>
-          <Paragraph style={{ fontSize: 14, marginBottom: 0 }}>
-            {plugin.description}
-          </Paragraph>
-        </Space>
+        <div className="p-4 rounded-lg border border-border bg-card">
+          <h5 className="text-base font-semibold m-0 flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            {t('content.description')}
+          </h5>
+          <p className="text-sm mb-0 mt-3">{plugin.description}</p>
+        </div>
       )}
 
       <ComponentsSection plugin={plugin} onOpenFile={onOpenFile} />
@@ -41,34 +30,26 @@ const DetailContent: React.FC<DetailContentProps> = ({ plugin, onOpenFile }) => 
       <ReadmeSection readme={plugin.readme} />
 
       {(plugin.dependencies?.length || plugin.license) && (
-        <Space direction="vertical" size={12} style={{
-          padding: 16,
-          background: 'var(--vscode-sideBar-background)',
-          borderRadius: 8,
-          border: '1px solid var(--vscode-panel-border)',
-          width: '100%'
-        }}>
-          <Title level={5} style={{ margin: 0 }}>{t('content.meta')}</Title>
+        <div className="p-4 rounded-lg border border-border bg-card">
+          <h5 className="text-base font-semibold m-0">{t('content.meta')}</h5>
           {plugin.dependencies?.length && (
-            <Space direction="vertical" size={4}>
-              <Text type="secondary">{t('content.dependencies')}:</Text>
-              <div style={{ marginTop: 4 }}>
+            <div className="mt-2">
+              <p className="text-sm text-muted-foreground mb-2">{t('content.dependencies')}:</p>
+              <div className="flex flex-wrap gap-2">
                 {plugin.dependencies.map(dep => (
-                  <Tag key={dep}>{dep}</Tag>
+                  <Badge key={dep} variant="default">{dep}</Badge>
                 ))}
               </div>
-            </Space>
+            </div>
           )}
           {plugin.license && (
-            <Space style={{ marginTop: 8 }}>
-              <Text type="secondary">{t('content.license')}:</Text>
-              <Tag>{plugin.license}</Tag>
-            </Space>
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">{t('content.license')}:</span>
+              <Badge variant="default">{plugin.license}</Badge>
+            </div>
           )}
-        </Space>
+        </div>
       )}
-    </Space>
+    </div>
   );
-};
-
-export default DetailContent;
+}

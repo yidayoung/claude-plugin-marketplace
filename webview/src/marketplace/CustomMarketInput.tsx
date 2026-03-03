@@ -1,11 +1,7 @@
-// vscode-extension/webview/src/marketplace/CustomMarketInput.tsx
-
-
-
+import { Search, Plus } from 'lucide-react';
+import { Input, Button } from '../components';
 import { useL10n } from '@/l10n';
-import { type VSCodeTheme, getVSCodeColors } from './useVSCodeTheme';
-
-const { Text } = Typography;
+import { type VSCodeTheme } from './useVSCodeTheme';
 
 interface CustomMarketInputProps {
   value: string;
@@ -15,47 +11,34 @@ interface CustomMarketInputProps {
   theme: VSCodeTheme;
 }
 
-export function CustomMarketInput({ value, onChange, onAdd, isLoading, theme }: CustomMarketInputProps) {
+export function CustomMarketInput({ value, onChange, onAdd, isLoading }: CustomMarketInputProps) {
   const { t } = useL10n();
-  const colors = getVSCodeColors(theme);
 
   return (
-    <Card
-      size="small"
-      style={{
-        borderColor: colors.cardBorder,
-        background: colors.cardBackground,
-        boxShadow: colors.shadow
-      }}
-      styles={{ body: { padding: '20px' } }}
-    >
-      <div style={{ marginBottom: '12px' }}>
-        <Text
-          strong
-          style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          <SearchOutlined />
+    <div className="p-5 rounded-lg border border-border bg-card shadow-sm mb-4">
+      <div className="mb-3">
+        <span className="text-sm font-semibold flex items-center gap-2">
+          <Search className="w-4 h-4" />
           {t('marketplace.discover.addCustom')}
-        </Text>
+        </span>
       </div>
-      <Space.Compact style={{ width: '100%' }}>
+      <div className="flex gap-2">
         <Input
           placeholder={t('marketplace.discover.inputPlaceholder')}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onPressEnter={onAdd}
-          size="large"
+          className="flex-1"
         />
         <Button
-          type="primary"
-          icon={<PlusOutlined />}
+          variant="primary"
           onClick={onAdd}
-          loading={isLoading}
-          size="large"
+          disabled={isLoading}
         >
+          <Plus className="w-4 h-4 mr-1" />
           {t('marketplace.discover.addButton')}
         </Button>
-      </Space.Compact>
-    </Card>
+      </div>
+    </div>
   );
 }

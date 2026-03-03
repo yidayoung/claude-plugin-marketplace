@@ -1,15 +1,9 @@
-// vscode-extension/webview/src/details/ReadmeSection.tsx
-
-import React from 'react';
-
+import { FileText } from 'lucide-react';
 import { useL10n } from '../l10n';
-
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkSlug from 'remark-slug';
 import rehypeRaw from 'rehype-raw';
-
-const { Title } = Typography;
 
 interface ReadmeSectionProps {
   readme?: string;
@@ -17,8 +11,13 @@ interface ReadmeSectionProps {
   marketplace?: string;
 }
 
-// 自定义链接组件，处理不同类型的链接
-const MarkdownLink: React.FC<{ href?: string; children: React.ReactNode; fileLinkTitle?: string }> = ({ href, children, fileLinkTitle }) => {
+interface MarkdownLinkProps {
+  href?: string;
+  children: React.ReactNode;
+  fileLinkTitle?: string;
+}
+
+function MarkdownLink({ href, children, fileLinkTitle }: MarkdownLinkProps) {
   if (!href) return <>{children}</>;
 
   if (href.startsWith('http://') || href.startsWith('https://')) {
@@ -29,6 +28,7 @@ const MarkdownLink: React.FC<{ href?: string; children: React.ReactNode; fileLin
           e.preventDefault();
           window.parent.postMessage({ type: 'openExternal', payload: { url: href } }, '*');
         }}
+        className="text-primary hover:underline"
       >
         {children}
       </a>
@@ -44,23 +44,21 @@ const MarkdownLink: React.FC<{ href?: string; children: React.ReactNode; fileLin
           window.parent.postMessage({ type: 'openFileLink', payload: { path: href } }, '*');
         }}
         title={fileLinkTitle ?? 'File link (direct access not supported)'}
-        style={{ cursor: 'not-allowed', opacity: 0.7 }}
+        className="cursor-not-allowed opacity-70"
       >
         {children}
       </a>
     );
   }
 
-  // 锚点链接 - 页面内跳转
   if (href.startsWith('#')) {
     return <a href={href}>{children}</a>;
   }
 
   return <a href={href}>{children}</a>;
-};
+}
 
-// 自定义图片组件，处理远程图片
-const MarkdownImage: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = (props) => {
+function MarkdownImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   const { src, alt, ...rest } = props;
 
   return (
@@ -69,31 +67,26 @@ const MarkdownImage: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = (prop
       alt={alt}
       {...rest}
       onError={(e) => {
-        // 图片加载失败时显示占位符
         (e.target as HTMLImageElement).style.display = 'none';
       }}
     />
   );
-};
+}
 
-const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme }) => {
+export default function ReadmeSection({ readme }: ReadmeSectionProps) {
   const { t } = useL10n();
-  if (!readme) {
-    return null;
-  }
+
+  if (!readme) return null;
+
   const linkComponent = (props: any) => <MarkdownLink {...props} fileLinkTitle={t('readme.fileLinkUnsupported')} />;
+
   return (
-    <Space direction="vertical" size={12} style={{
-      padding: 16,
-      background: 'var(--vscode-sideBar-background)',
-      borderRadius: 8,
-      border: '1px solid var(--vscode-panel-border)',
-      width: '100%'
-    }}>
-      <Title level={5} style={{ margin: 0 }}>
-        <FileTextOutlined /> {t('readme.title')}
-      </Title>
-      <div className="markdown-body">
+    <div className="p-4 rounded-lg border border-border bg-card">
+      <h5 className="text-base font-semibold m-0 flex items-center gap-2">
+        <FileText className="w-4 h-4" />
+        {t('readme.title')}
+      </h5>
+      <div className="markdown-body mt-3">
         <ReactMarkdown
           remarkPlugins={[remarkGfm, [remarkSlug as any]]}
           rehypePlugins={[rehypeRaw]}
@@ -105,8 +98,6 @@ const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme }) => {
           {readme}
         </ReactMarkdown>
       </div>
-    </Space>
+    </div>
   );
-};
-
-export default ReadmeSection;
+}

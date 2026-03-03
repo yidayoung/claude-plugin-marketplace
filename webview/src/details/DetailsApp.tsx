@@ -1,19 +1,16 @@
-// vscode-extension/webview/src/details/DetailsApp.tsx
-
 import React, { useState, useEffect, useRef } from 'react';
-
-
+import { RefreshCw, AlertCircle } from 'lucide-react';
+import { Button } from '../components';
 import DetailHeader from './DetailHeader';
 import DetailContent from './DetailContent';
 import { useL10n } from '../l10n';
 import type { Source } from '../types/sourceTypes';
 
-// 从 window 获取 vscode API（由 details/main.tsx 注入）
+// 从 window 获取 vscode API
 declare const vscode: {
   postMessage: (message: any) => void;
 };
 
-// 类型别名
 export type MarketplaceSource = Source;
 
 export interface PluginDetailData {
@@ -96,13 +93,13 @@ export interface RepositoryInfo {
   stars?: number;
 }
 
-const DetailsApp: React.FC = () => {
+export default function DetailsApp() {
   const { t } = useL10n();
   const [plugin, setPlugin] = useState<PluginDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [readyNotified, setReadyNotified] = useState(false);
-  const messageReceivedRef = useRef(false); // 使用 ref 避免闭包问题
+  const messageReceivedRef = useRef(false);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -112,11 +109,10 @@ const DetailsApp: React.FC = () => {
           setPlugin(message.payload.plugin);
           setLoading(false);
           setError(null);
-          messageReceivedRef.current = true; // 标记已收到消息
+          messageReceivedRef.current = true;
           break;
         case 'detailUpdate':
         case 'statusUpdate':
-          // 插件数据变更时，请求完整重新拉取
           vscode.postMessage({
             type: 'refreshPluginDetail'
           });
@@ -131,19 +127,15 @@ const DetailsApp: React.FC = () => {
 
     window.addEventListener('message', handleMessage);
 
-    // 通知扩展侧 webview 已准备好接收数据
     if (!readyNotified) {
       vscode.postMessage({ type: 'ready' });
       setReadyNotified(true);
     }
 
-    // 添加超时处理：如果 30 秒后还没收到消息，只停止加载状态
-    // 不会覆盖已加载的插件内容
     const timeoutId = setTimeout(() => {
-      if (!messageReceivedRef.current) { // 使用 ref 检查最新的状态
+      if (!messageReceivedRef.current) {
         console.error('[DetailsApp] Timeout waiting for plugin data');
-        setLoading(false); // 停止加载状态，但不设置 error
-        // 不设置 setError，避免覆盖已显示的插件内容
+        setLoading(false);
       }
     }, 30000);
 
@@ -151,7 +143,7 @@ const DetailsApp: React.FC = () => {
       window.removeEventListener('message', handleMessage);
       clearTimeout(timeoutId);
     };
-  }, [readyNotified]); // 只依赖 readyNotified，确保 effect 只执行一次
+  }, [readyNotified]);
 
   const handleInstall = (scope: 'user' | 'project') => {
     if (!plugin) return;
@@ -212,50 +204,58 @@ const DetailsApp: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin indicator={<LoadingOutlined style={{ fontSize: 32 }} spin />} tip={t('detail.loading')} />
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <RefreshCw className="w-8 h-8 animate-spin" />
+          <span className="text-sm">{t('detail.loading')}</span>
+        </div>
       </div>
     );
   }
 
-  // 只有在没有任何插件数据时才显示错误页面
   if (!plugin && error) {
     return (
-      <div style={{ padding: 24 }}>
-        <Alert
-          type="error"
-          description={error}
-          action={
-            <Button size="small" danger onClick={() => window.location.reload()}>
-              <ReloadOutlined /> {t('detail.retry')}
+      <div className="p-6">
+        <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-destructive">{error}</p>
+              </div>
+            </div>
+            <Button size="sm" variant="destructive" onClick={() => window.location.reload()}>
+              <RefreshCw className="w-3 h-3 mr-1" />
+              {t('detail.retry')}
             </Button>
-          }
-          showIcon
-        />
+          </div>
+        </div>
       </div>
     );
   }
 
-  // 没有插件数据且没有错误
   if (!plugin) {
     return (
-      <div style={{ padding: 24 }}>
-        <Alert description={t('detail.notFound')} type="warning" showIcon />
+      <div className="p-6">
+        <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+          <div className="flex items-center gap-2 text-sm">
+            <AlertCircle className="w-5 h-5 text-yellow-500" />
+            <p className="text-yellow-500">{t('detail.notFound')}</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 1200, minWidth: 800, margin: '0 auto' }}>
-      {/* 如果有插件数据但有错误，在顶部显示警告（不覆盖内容） */}
+    <div className="p-5 max-w-[1200px] min-w-[800px] mx-auto">
       {error && (
-        <Alert
-          type="warning"
-          description={error}
-          closable
-          style={{ marginBottom: 16 }}
-          showIcon
-        />
+        <div className="mb-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <AlertCircle className="w-4 h-4 text-yellow-500" />
+            <span className="text-yellow-500">{error}</span>
+          </div>
+        </div>
       )}
       <DetailHeader
         plugin={plugin}
@@ -269,6 +269,4 @@ const DetailsApp: React.FC = () => {
       <DetailContent plugin={plugin} onOpenFile={handleOpenFile} />
     </div>
   );
-};
-
-export default DetailsApp;
+}
