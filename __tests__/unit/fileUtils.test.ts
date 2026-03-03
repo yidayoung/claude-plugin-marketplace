@@ -1,7 +1,7 @@
 // src/shared/utils/__tests__/fileUtils.test.ts
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { tryReadFile, findFileInPaths, accessWithDefault } from '../fileUtils';
+import { tryReadFile, findFileInPaths, accessWithDefault } from '../../src/shared/utils/fileUtils';
 
 // Mock fs module
 jest.mock('fs/promises');

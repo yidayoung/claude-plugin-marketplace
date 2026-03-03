@@ -1,6 +1,6 @@
 // src/pluginMarketplace/webview/services/__tests__/ContentParser.test.ts
 
-import { ContentParser } from '../ContentParser';
+import { ContentParser } from '../../src/pluginMarketplace/webview/services/ContentParser';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as fsTypes from 'fs';

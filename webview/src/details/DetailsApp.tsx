@@ -5,6 +5,7 @@ import DetailHeader from './DetailHeader';
 import DetailContent from './DetailContent';
 import { useL10n } from '../l10n';
 import type { Source } from '../types/sourceTypes';
+import { logger } from '../shared/utils/logger';
 
 // 从 window 获取 vscode API
 declare const vscode: {
@@ -134,7 +135,7 @@ export default function DetailsApp() {
 
     const timeoutId = setTimeout(() => {
       if (!messageReceivedRef.current) {
-        console.error('[DetailsApp] Timeout waiting for plugin data');
+        logger.error('[DetailsApp] Timeout waiting for plugin data');
         setLoading(false);
       }
     }, 30000);

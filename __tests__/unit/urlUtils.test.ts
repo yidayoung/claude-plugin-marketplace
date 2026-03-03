@@ -1,5 +1,5 @@
 // src/shared/utils/__tests__/urlUtils.test.ts
-import { normalizeRepoUrlForBrowser } from '../urlUtils';
+import { normalizeRepoUrlForBrowser } from '../../src/shared/utils/urlUtils';
 
 describe('normalizeRepoUrlForBrowser', () => {
   it('should convert SSH URL to HTTPS', () => {

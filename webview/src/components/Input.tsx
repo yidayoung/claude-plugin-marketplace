@@ -9,9 +9,9 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, type = 'text', ...props }, ref) => {
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1">
         {label && (
-          <label className="text-sm font-medium text-foreground">
+          <label className="text-xs font-medium text-text-secondary">
             {label}
           </label>
         )}
@@ -19,19 +19,22 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           type={type}
           className={cn(
-            'px-3 py-2 rounded-md border border-border',
-            'bg-card text-foreground text-sm',
-            'placeholder:text-muted-foreground',
-            'focus:outline-none focus:ring-2 focus:ring-primary',
+            // VS Code 输入框样式
+            'px-2 py-1.5 rounded border',
+            'bg-input-bg text-input-fg text-sm',
+            'placeholder:text-input-placeholder',
+            'border-input-border',
+            'focus:outline-none focus:border-focus-border focus:outline-1 focus:outline-focus-border',
             'disabled:opacity-50 disabled:cursor-not-allowed',
-            'transition-colors duration-200',
-            error && 'border-destructive focus:ring-destructive',
+            'transition-colors duration-150',
+            // 错误状态
+            error && 'border-error-fg focus:border-error-fg focus:outline-error-fg',
             className
           )}
           {...props}
         />
         {error && (
-          <span className="text-xs text-destructive">{error}</span>
+          <span className="text-xs text-error-fg">{error}</span>
         )}
       </div>
     );

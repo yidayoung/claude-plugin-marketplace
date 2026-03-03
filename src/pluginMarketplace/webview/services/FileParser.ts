@@ -12,6 +12,7 @@ import {
   MarketplaceConfig,
   PluginScope
 } from '../../types';
+import { logger } from '../../../shared/utils/logger';
 
 /**
  * 文件解析类 - 从本地 Claude 配置文件读取数据
@@ -40,7 +41,7 @@ export class FileParser {
         })
       );
     } catch (error) {
-      console.error('Failed to parse installed plugins:', error);
+      logger.error('Failed to parse installed plugins:', error);
       return [];
     }
   }
@@ -98,7 +99,7 @@ export class FileParser {
         autoUpdate: info.autoUpdate
       }));
     } catch (error) {
-      console.error('Failed to parse marketplaces:', error);
+      logger.error('Failed to parse marketplaces:', error);
       return [];
     }
   }
@@ -113,7 +114,7 @@ export class FileParser {
       const content = await fs.readFile(configPath, 'utf-8');
       return JSON.parse(content);
     } catch (error) {
-      console.error(`Failed to parse marketplace config for ${marketplaceName}:`, error);
+      logger.error(`Failed to parse marketplace config for ${marketplaceName}:`, error);
       return null;
     }
   }

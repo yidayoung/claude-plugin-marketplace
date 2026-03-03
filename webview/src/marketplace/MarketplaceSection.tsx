@@ -1,7 +1,8 @@
-import { type VSCodeTheme, getVSCodeColors } from './useVSCodeTheme';
+import { type VSCodeTheme } from './useVSCodeTheme';
 import { MarketplaceCard } from './MarketplaceCard';
 import { type RecommendedMarketplace } from './config';
 import type { ReactNode } from 'react';
+import { isMarketplaceAdded } from './marketplaceMatching';
 
 interface MarketplaceSectionProps {
   title: string;
@@ -26,55 +27,44 @@ export function MarketplaceSection({
   onAdd,
   onRemove
 }: MarketplaceSectionProps) {
-  const colors = getVSCodeColors(theme);
-
-  const isMarketplaceAdded = (market: RecommendedMarketplace): boolean => {
-    const possibleNames: string[] = [];
-
-    if (market.name) {
-      possibleNames.push(market.name);
-    }
-
-    if (market.source.includes('/')) {
-      const repoPart = market.source.split('/').pop()!;
-      possibleNames.push(repoPart);
-      const ownerPart = market.source.split('/')[0];
-      possibleNames.push(ownerPart);
-    } else {
-      possibleNames.push(market.source);
-    }
-
-    if (market.id.includes('/')) {
-      const ownerFromId = market.id.split('/')[0];
-      const repoFromId = market.id.split('/')[1];
-      possibleNames.push(ownerFromId);
-      possibleNames.push(repoFromId);
-    }
-
-    return possibleNames.some(name => name && addedMarketplaces.has(name));
-  };
+  if (markets.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="mb-8">
-      <div className="flex items-center gap-1.5 mb-4">
-        <span style={{ color: iconColor, fontSize: '16px', display: 'flex', alignItems: 'center' }}>
-          {icon}
-        </span>
-        <span className="text-base font-semibold">{title}</span>
+    <section className="mb-10">
+      <div className="mb-4 flex items-center gap-3">
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-white"
+          style={{ backgroundColor: iconColor }}
+        >
+          <span className="text-sm">{icon}</span>
+        </div>
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <div className="h-px flex-1 bg-border" />
+        <div className="rounded-md border border-border bg-background px-2 py-1 text-xs text-text-secondary">
+          {markets.length} markets
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {markets.map(market => (
-          <MarketplaceCard
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {markets.map((market, index) => (
+          <div
             key={market.id}
-            market={market}
-            isAdded={isMarketplaceAdded(market)}
-            isLoading={loading === market.name}
-            theme={theme}
-            onAdd={onAdd}
-            onRemove={onRemove}
-          />
+            className="opacity-0 animate-fade-in"
+            style={{ animationDelay: `${index * 75}ms`, animationFillMode: 'forwards' }}
+          >
+            <MarketplaceCard
+              market={market}
+              isAdded={isMarketplaceAdded(market, addedMarketplaces)}
+              isLoading={loading === market.name}
+              theme={theme}
+              onAdd={onAdd}
+              onRemove={onRemove}
+            />
+          </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

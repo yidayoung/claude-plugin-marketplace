@@ -7,17 +7,25 @@ export interface BadgeProps {
 }
 
 export function Badge({ variant = 'default', children, className }: BadgeProps) {
+  // VS Code 样式的 Badge
   const variantStyles = {
-    default: 'bg-muted text-muted-foreground',
-    success: 'bg-green-500/10 text-green-500',
-    warning: 'bg-yellow-500/10 text-yellow-500',
-    error: 'bg-destructive/10 text-destructive'
+    // Default badge - 使用 VS Code 的 badge 颜色
+    default: 'bg-badge-bg text-badge-fg',
+
+    // Success badge - 使用终端绿色
+    success: 'bg-success-fg/10 text-success-fg',
+
+    // Warning badge - 使用 VS Code 的警告颜色
+    warning: 'bg-warning-fg/10 text-warning-fg',
+
+    // Error badge - 使用 VS Code 的错误颜色
+    error: 'bg-error-fg/10 text-error-fg'
   };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium',
+        'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium',
         variantStyles[variant],
         className
       )}

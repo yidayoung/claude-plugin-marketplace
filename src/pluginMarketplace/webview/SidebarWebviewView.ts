@@ -5,6 +5,7 @@ import { PluginDataStore } from '../data/PluginDataStore';
 import { MessageHandler } from './messages/handlers';
 import { StoreEvent } from '../data/types';
 import { PluginStatusChangeEvent } from '../data/types';
+import { logger } from '../../shared/utils/logger';
 
 /**
  * 侧边栏 WebviewView Provider
@@ -62,7 +63,7 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
     // 监听插件状态变更事件
     this._disposables.push(
       this._dataStore.on(StoreEvent.PluginStatusChange, (event: PluginStatusChangeEvent) => {
-        console.log('[SidebarWebviewView] Plugin status changed:', event);
+        logger.debug('[SidebarWebviewView] Plugin status changed:', event);
         // 刷新侧边栏数据
         this.refreshData();
       })
@@ -71,21 +72,22 @@ export class SidebarWebviewViewProvider implements vscode.WebviewViewProvider {
     // 监听市场变更事件
     this._disposables.push(
       this._dataStore.on(StoreEvent.MarketplaceChange, () => {
-        console.log('[SidebarWebviewView] Marketplace changed, refreshing data');
+        logger.debug('[SidebarWebviewView] Marketplace changed, refreshing data');
         // 刷新侧边栏数据
         this.refreshData();
       })
     );
 
     // 监听消息
-    webviewView.webview.onDidReceiveMessage(
+    const messageDisposable = webviewView.webview.onDidReceiveMessage(
       async message => {
-        console.log('[SidebarWebviewView] Received message:', message.type, message.payload);
+        logger.debug('[SidebarWebviewView] Received message:', message.type, message.payload);
         if (this._messageHandler) {
           await this._messageHandler.handleMessage(message);
         }
       }
     );
+    this._disposables.push(messageDisposable);
 
     // 监听可见性变化
     webviewView.onDidChangeVisibility(() => {

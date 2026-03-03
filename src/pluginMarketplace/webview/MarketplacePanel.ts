@@ -8,7 +8,7 @@ import { logger } from '../../shared/utils/logger';
 
 // Webview 消息类型
 type WebviewMessage = {
-  type: 'ready' | 'addMarketplace' | 'addRecommendedMarketplace' | 'openExternal' | 'removeMarketplace';
+  type: 'ready' | 'addMarketplace' | 'addRecommendedMarketplace' | 'openExternal' | 'removeMarketplace' | 'refreshMarketplaceStars';
   payload?: any;
 };
 
@@ -21,7 +21,7 @@ type ExtensionMessage = {
 // 市场信息（带 stars）
 interface MarketplaceWithStars {
   name: string;
-  stars: number;
+  stars?: number;
 }
 
 /**
@@ -142,7 +142,7 @@ export class MarketplacePanel {
     }));
 
     // 同时发送内置市场的 stars 数据（用于未安装的市场显示）
-    const builtinStars: Record<string, number> = {};
+    const builtinStars: Record<string, number | undefined> = {};
     for (const builtin of BUILTIN_MARKETPLACES) {
       // 如果已安装，使用已有的 stars；否则从缓存获取
       const existing = marketplacesWithStars.find(m => m.name === builtin.name);
@@ -224,6 +224,12 @@ export class MarketplacePanel {
           }
           break;
         }
+        case 'refreshMarketplaceStars': {
+          logger.debug('[MarketplacePanel] Manually refreshing marketplace stars');
+          await this._dataStore.refreshMarketplaceStars(true);
+          this.sendMarketplaceList();
+          break;
+        }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -301,6 +307,9 @@ export class MarketplacePanel {
     const scriptUri = this._panel.webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'marketplace.js')
     );
+    const styleUri = this._panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, 'webview', 'dist', 'marketplace.css')
+    );
 
     const title = vscode.l10n.t('marketplace.discover.title');
     const initState = encodeURIComponent(JSON.stringify({
@@ -317,6 +326,7 @@ export class MarketplacePanel {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${this._panel.webview.cspSource} 'unsafe-inline' 'unsafe-eval'; style-src ${this._panel.webview.cspSource} 'unsafe-inline';">
+  <link href="${styleUri}" rel="stylesheet">
   <title>${title}</title>
 </head>
 <body>

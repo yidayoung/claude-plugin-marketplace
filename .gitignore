@@ -69,3 +69,5 @@ webview-app/node_modules
 
 # docs (本地参考文档，不提交到仓库)
 docs/
+
+.codex/

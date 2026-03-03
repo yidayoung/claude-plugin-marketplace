@@ -57,7 +57,7 @@ export default function DetailHeader({
                 <FolderOpen className="w-4 h-4" />
               </button>
             )}
-            <span className="px-2 py-0.5 text-xs font-medium rounded bg-blue-500/10 text-blue-500">
+            <span className="px-2 py-0.5 text-xs font-medium rounded bg-badge-bg text-badge-fg">
               v{plugin.version}
             </span>
           </div>
@@ -75,7 +75,7 @@ export default function DetailHeader({
               {plugin.marketplace}
             </span>
             {plugin.repository?.stars && (
-              <span> · <Star className="w-3 h-3 text-yellow-500 inline" /> {plugin.repository.stars}</span>
+              <span> · <Star className="w-3 h-3 text-warning-fg inline" /> {plugin.repository.stars}</span>
             )}
           </p>
         </div>
@@ -102,22 +102,33 @@ export default function DetailHeader({
 
           {plugin.installed ? (
             <>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={!isDisabled}
-                  onChange={(e) => (e.target.checked ? onEnable() : onDisable())}
-                  className="w-4 h-4 rounded"
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!isDisabled}
+                aria-label={!isDisabled ? t('header.disablePlugin') : t('header.enablePlugin')}
+                title={!isDisabled ? t('header.disablePlugin') : t('header.enablePlugin')}
+                onClick={() => (!isDisabled ? onDisable() : onEnable())}
+                className={`relative inline-flex h-6 w-12 items-center rounded-full border shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-focus-border ${
+                  !isDisabled
+                    ? 'bg-green-500 border-green-400'
+                    : 'bg-muted border-border'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                    !isDisabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
                 />
-              </label>
+              </button>
               {plugin.scope && (
-                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-500/10 text-green-500 border border-green-500/30">
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-success-fg/10 text-success-fg border border-success-fg/30">
                   {plugin.scope === 'user' ? <User className="w-3 h-3 inline mr-1" /> : <Folder className="w-3 h-3 inline mr-1" />}
                   {plugin.scope === 'user' ? t('header.scopeUser') : t('header.scopeProject')}
                 </span>
               )}
               <button
-                className="p-1 hover:bg-destructive/10 rounded transition-colors text-destructive"
+                className="p-1 hover:bg-error-fg/10 rounded transition-colors text-error-fg"
                 onClick={onUninstall}
                 title={t('header.uninstallBtn')}
               >
@@ -126,7 +137,7 @@ export default function DetailHeader({
             </>
           ) : (
             <div className="flex items-center gap-1">
-              <Button size="sm" variant="primary" onClick={() => onInstall('user')}>
+              <Button size="sm" variant="secondary" onClick={() => onInstall('user')}>
                 <Download className="w-3 h-3 mr-1" />
                 {t('header.install')}
               </Button>

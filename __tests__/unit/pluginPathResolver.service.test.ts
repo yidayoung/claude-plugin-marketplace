@@ -1,6 +1,6 @@
 // vscode-extension/src/pluginMarketplace/webview/services/__tests__/PluginPathResolver.test.ts
 
-import { PluginPathResolver } from '../PluginPathResolver';
+import { PluginPathResolver } from '../../src/pluginMarketplace/webview/services/PluginPathResolver';
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';

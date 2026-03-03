@@ -19,7 +19,7 @@ import { PluginInfo } from '../../types';
 import { PluginPathResolver } from './PluginPathResolver';
 import { ContentParser } from './ContentParser';
 import { tryReadFile } from '@shared/utils/fileUtils';
-import { parseFrontmatter, parseGitHubRepo, getCustomPaths, parseRepository as parseRepositoryUtil } from '@shared/utils/parseUtils';
+import { parseFrontmatter, getCustomPaths, parseRepository as parseRepositoryUtil } from '@shared/utils/parseUtils';
 import { normalizeRepoUrlForBrowser } from '@shared/utils/urlUtils';
 import { logger } from '../../../shared/utils/logger';
 
@@ -491,49 +491,6 @@ export class PluginDetailsService {
       // 忽略错误
     }
     return '';
-  }
-
-  /**
-   * 获取 GitHub stars 数
-   */
-  private async fetchGitHubStars(owner: string, repo: string): Promise<number> {
-    try {
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
-      if (response.ok) {
-        const data = (await response.json()) as { stargazers_count?: number };
-        return data.stargazers_count || 0;
-      }
-    } catch {
-      // 忽略错误
-    }
-    return 0;
-  }
-
-  /**
-   * 异步获取插件的 GitHub stars（不阻塞主流程）
-   * 返回 Promise，调用者可以选择 await 或在后台执行
-   */
-  async fetchPluginStarsAsync(pluginName: string, marketplace: string): Promise<number | null> {
-    try {
-      const parser = await this.getFileParser();
-      const marketplaces = await parser.parseMarketplaces();
-      const market = marketplaces.find((m: any) => m.name === marketplace);
-
-      if (!market || market.source.source !== 'github' || !market.source.repo) {
-        return null;
-      }
-
-      const repoInfo = parseGitHubRepo(market.source.repo);
-      if (!repoInfo) {
-        return null;
-      }
-      const stars = await this.fetchGitHubStars(repoInfo.owner, repoInfo.repo);
-      logger.debug(`获取 ${pluginName} 的 stars: ${stars}`);
-      return stars;
-    } catch (error) {
-      logger.error(`获取 ${pluginName} 的 stars 失败:`, error);
-      return null;
-    }
   }
 
   /**

@@ -6,6 +6,7 @@ import { StoreEvent } from '../data/types';
 import { PluginDetailUpdateEvent, PluginStatusChangeEvent } from '../data/types';
 import { OpenFilePayload } from './messages/types';
 import { logger } from '../../shared/utils/logger';
+import { getPreferredOpenMode } from './utils/openFileStrategy';
 
 /**
  * 插件详情 Webview Panel 管理器
@@ -176,7 +177,7 @@ export class PluginDetailsPanel {
       // 注意：stars 已经由 PluginDataStore 自动异步加载，这里不需要额外处理
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error(`[PluginDetailsPanel] Error loading details:`, errorMsg);
+      logger.error(`[PluginDetailsPanel] Error loading details:`, errorMsg);
       this.sendMessage({
         type: 'error',
         payload: { message: `加载插件详情失败: ${errorMsg}` }
@@ -255,6 +256,18 @@ export class PluginDetailsPanel {
           // 打开文件并显示在编辑器中
           const filePath = message.payload.filePath;
           const fileUri = vscode.Uri.file(filePath);
+          if (getPreferredOpenMode(filePath) === 'markdown-editor') {
+            try {
+              await vscode.commands.executeCommand(
+                'vscode.openWith',
+                fileUri,
+                'vscode.markdown.preview.editor'
+              );
+              break;
+            } catch {
+              // 回退到普通文本编辑器
+            }
+          }
           const doc = await vscode.workspace.openTextDocument(fileUri);
           await vscode.window.showTextDocument(doc);
           break;

@@ -35,11 +35,12 @@ export function PluginSection({
   actions
 }: PluginSectionProps) {
   return (
-    <div className="space-y-1">
+    <section className="space-y-2">
       <div
         className={cn(
-          "flex items-center gap-1 px-2 py-1 rounded-md cursor-pointer",
-          "hover:bg-muted/50 transition-colors duration-200"
+          'group flex items-center gap-2 rounded-lg border border-border/60 bg-card/55 px-2.5 py-1.5',
+          'cursor-pointer transition-colors duration-200 hover:bg-hover-bg/60',
+          isHovered && 'bg-hover-bg/60'
         )}
         onClick={(e) => {
           if ((e.target as HTMLElement).closest('button')) {
@@ -50,25 +51,34 @@ export function PluginSection({
         onMouseEnter={() => onHoverChange(`section-${sectionKey}`, true)}
         onMouseLeave={() => onHoverChange(`section-${sectionKey}`, false)}
       >
-        <span className="flex items-center text-xs">
-          {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-muted/40 text-text-secondary">
+          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
         </span>
-        <span className="font-medium text-sm text-foreground">{title}</span>
-        <span className="text-sm text-muted-foreground">({count})</span>
-        {actions && (
-          <div
-            className={cn(
-              "ml-auto flex items-center gap-0.5",
-              "opacity-0 group-hover:opacity-100 transition-opacity duration-200",
-              isHovered && "opacity-100"
-            )}
-          >
-            {actions}
-          </div>
-        )}
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[12px] font-semibold tracking-wide text-foreground">{title}</p>
+        </div>
+
+        <div className="ml-auto flex items-center gap-1">
+          {actions && (
+            <div
+              className={cn(
+                'flex items-center gap-0.5 transition-opacity duration-200',
+                isHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              )}
+            >
+              {actions}
+            </div>
+          )}
+
+          <span className="rounded-full border border-border/70 bg-muted/45 px-1.5 py-0.5 text-[10px] leading-none text-text-secondary">
+            {count}
+          </span>
+        </div>
       </div>
-      {isExpanded && <div className="pl-4">{children}</div>}
-    </div>
+
+      {isExpanded && <div className="space-y-2 pl-1">{children}</div>}
+    </section>
   );
 }
 
@@ -99,19 +109,19 @@ export function MarketSectionActions({ marketName }: MarketSectionActionsProps) 
     <>
       <Button
         size="sm"
-        variant="ghost"
+        variant="icon"
         onClick={handleRefreshMarket}
         title={t('section.refreshMarket')}
       >
-        <RefreshCw className="w-3 h-3" />
+        <RefreshCw className="h-3 w-3" />
       </Button>
       <Button
         size="sm"
-        variant="ghost"
+        variant="icon"
         onClick={handleRemoveMarket}
         title={t('section.removeMarket')}
       >
-        <Trash2 className="w-3 h-3" />
+        <Trash2 className="h-3 w-3" />
       </Button>
     </>
   );
