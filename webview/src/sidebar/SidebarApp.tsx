@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Search, CheckCircle2, RefreshCw, MoreVertical, Store, Sync, XCircle } from 'lucide-react';
-import { cn } from '../lib/cn';
+import { Search, CheckCircle2, RefreshCw, Store, XCircle } from 'lucide-react';
 import { Input, Button } from '../components';
 import { usePluginData, usePluginFilter, useHoverState } from '../hooks';
 import { PluginItem, PluginSection, MarketSectionActions } from '../components';
@@ -19,7 +18,7 @@ const SidebarApp: React.FC = () => {
   const { groupedPlugins, stats } = usePluginFilter(state.plugins, state.filter);
   const { isHovered, setHovered } = useHoverState();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['installed', 'available'])
+    new Set(['installed'])
   );
 
   const handleSearch = (keyword: string) => {
@@ -65,6 +64,12 @@ const SidebarApp: React.FC = () => {
     );
   }
 
+  // 计算可用插件数量
+  const availableCount = stats.total - stats.installed;
+
+  // 获取市场列表
+  const marketList = Object.keys(groupedPlugins.byMarketplace).sort();
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -84,7 +89,7 @@ const SidebarApp: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>{t('sidebar.installed')}: {stats.installed}</span>
-            <span>{t('sidebar.available')}: {stats.available}</span>
+            <span>{t('sidebar.available')}: {availableCount}</span>
           </div>
 
           <div className="flex items-center gap-1">
@@ -111,12 +116,11 @@ const SidebarApp: React.FC = () => {
               <Store className="w-4 h-4" />
             </Button>
 
-            {state.plugins.some(p => p.updateAvailable) && (
+            {stats.updatable > 0 && (
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  // Update all logic
                   state.plugins
                     .filter(p => p.updateAvailable)
                     .forEach(p => {
@@ -128,7 +132,7 @@ const SidebarApp: React.FC = () => {
                 }}
                 title={t('sidebar.updateAll')}
               >
-                <Sync className="w-4 h-4" />
+                <RefreshCw className="w-4 h-4" />
               </Button>
             )}
           </div>
@@ -137,25 +141,51 @@ const SidebarApp: React.FC = () => {
 
       {/* Plugin List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-4">
-        {groupedPlugins.map(([marketplace, plugins]) => {
-          const sectionId = `${marketplace}-section`;
-          const isExpanded = expandedSections.has(sectionId);
+        {/* 已安装插件 */}
+        {groupedPlugins.installed.length > 0 && (
+          <PluginSection
+            title={t('sidebar.installed')}
+            count={groupedPlugins.installed.length}
+            sectionKey="installed"
+            isExpanded={expandedSections.has('installed')}
+            isHovered={isHovered('section-installed')}
+            onToggle={toggleSection}
+            onHoverChange={setHovered}
+          >
+            {groupedPlugins.installed.map(plugin => (
+              <PluginItem
+                key={plugin.name}
+                plugin={plugin}
+                isHovered={isHovered(`plugin-${plugin.name}`)}
+                onHoverChange={setHovered}
+              />
+            ))}
+          </PluginSection>
+        )}
+
+        {/* 按市场分组的插件 */}
+        {marketList.map(marketName => {
+          const plugins = groupedPlugins.byMarketplace[marketName];
+          const sectionId = `market-${marketName}`;
           const installedCount = plugins.filter(p => p.installed).length;
 
           return (
             <PluginSection
-              key={marketplace}
-              id={sectionId}
-              title={marketplace}
+              key={marketName}
+              title={marketName}
               count={installedCount}
-              expanded={isExpanded}
-              onToggle={() => toggleSection(sectionId)}
+              sectionKey={sectionId}
+              isExpanded={expandedSections.has(sectionId)}
+              isHovered={isHovered(`section-${sectionId}`)}
+              onToggle={toggleSection}
+              onHoverChange={setHovered}
+              actions={<MarketSectionActions marketName={marketName} />}
             >
               {plugins.map(plugin => (
                 <PluginItem
                   key={`${plugin.marketplace}-${plugin.name}`}
                   plugin={plugin}
-                  isHovered={isHovered(plugin.name)}
+                  isHovered={isHovered(`plugin-${plugin.name}`)}
                   onHoverChange={setHovered}
                 />
               ))}
@@ -163,7 +193,8 @@ const SidebarApp: React.FC = () => {
           );
         })}
 
-        {groupedPlugins.length === 0 && (
+        {/* 空状态 */}
+        {groupedPlugins.installed.length === 0 && marketList.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Store className="w-12 h-12 mb-3 opacity-50" />
             <p className="text-sm">{t('sidebar.noResults')}</p>

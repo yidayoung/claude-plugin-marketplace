@@ -27,7 +27,7 @@ export function CustomMarketInput({ value, onChange, onAdd, isLoading }: CustomM
           placeholder={t('marketplace.discover.inputPlaceholder')}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onPressEnter={onAdd}
+          onKeyDown={(e) => e.key === 'Enter' && onAdd()}
           className="flex-1"
         />
         <Button
