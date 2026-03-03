@@ -2,6 +2,14 @@
 
 本文档列出了所有需要手动测试的功能点。
 
+## 自动化测试目录（推荐结构）
+
+- `__tests__/unit/`: 纯单元测试（Jest）
+- `__tests__/integration/`: 需要文件系统/真实流程的集成测试（Jest）
+- `src/test/suite/`: VS Code 扩展宿主测试（Mocha，`npm run test:vscode` 使用）
+
+说明：为兼容 VS Code 官方测试运行器，扩展宿主测试保持在 `src/test/suite`，其余 Jest 测试统一集中到根目录 `__tests__`。
+
 ## 前置条件
 
 1. 已安装 Claude Code CLI

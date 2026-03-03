@@ -171,17 +171,32 @@ export class DataLoader {
   /**
    * 获取 GitHub stars（异步，不阻塞）
    */
-  async fetchGitHubStars(owner: string, repo: string): Promise<number> {
+  async fetchGitHubStars(owner: string, repo: string): Promise<number | undefined> {
+    const repoKey = `${owner}/${repo}`;
     try {
       const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+      const remaining = response.headers.get('x-ratelimit-remaining');
+      const reset = response.headers.get('x-ratelimit-reset');
+      logger.debug(
+        `[DataLoader] fetchGitHubStars response repo=${repoKey} status=${response.status} remaining=${remaining ?? 'n/a'} reset=${reset ?? 'n/a'}`
+      );
+
       if (response.ok) {
         const data = (await response.json()) as { stargazers_count?: number };
-        return data.stargazers_count || 0;
+        if (typeof data.stargazers_count === 'number') {
+          logger.debug(`[DataLoader] fetchGitHubStars success repo=${repoKey} stars=${data.stargazers_count}`);
+          return data.stargazers_count;
+        }
+        logger.warn(`[DataLoader] fetchGitHubStars missing stargazers_count repo=${repoKey}`);
+        return undefined;
       }
-    } catch {
-      // 忽略错误
+
+      logger.warn(`[DataLoader] fetchGitHubStars non-ok response repo=${repoKey} status=${response.status}`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.warn(`[DataLoader] fetchGitHubStars failed repo=${repoKey}: ${errorMsg}`);
     }
-    return 0;
+    return undefined;
   }
 
   /**

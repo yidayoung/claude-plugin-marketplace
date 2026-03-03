@@ -1,22 +1,7 @@
-// vscode-extension/webview/src/details/DetailHeader.tsx
-
-import React from 'react';
-import { Space, Tag, Button, Dropdown, Tooltip, Typography, Divider, Flex, Switch, Modal } from 'antd';
-import {
-  DeleteOutlined,
-  DownloadOutlined,
-  UserOutlined,
-  FolderOutlined,
-  FolderOpenOutlined,
-  GithubOutlined,
-  LinkOutlined,
-  StarFilled
-} from '@ant-design/icons';
-import type { MenuProps } from 'antd';
-import type { PluginDetailData } from './DetailsApp';
+import { User, Folder, FolderOpen, Github, ExternalLink, Star, Download, Trash2 } from 'lucide-react';
+import { Button } from '../components';
 import { useL10n } from '../l10n';
-
-const { Text, Title } = Typography;
+import type { PluginDetailData } from './DetailsApp';
 
 interface DetailHeaderProps {
   plugin: PluginDetailData;
@@ -28,7 +13,7 @@ interface DetailHeaderProps {
   onOpenDirectory?: (directoryPath: string) => void;
 }
 
-const DetailHeader: React.FC<DetailHeaderProps> = ({
+export default function DetailHeader({
   plugin,
   onInstall,
   onUninstall,
@@ -36,202 +21,132 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({
   onDisable,
   onOpenExternal,
   onOpenDirectory
-}) => {
+}: DetailHeaderProps) {
   const { t } = useL10n();
-  const scopeConfig = {
-    user: { label: t('header.scopeUser'), icon: <UserOutlined />, color: '#52c41a' },
-    project: { label: t('header.scopeProject'), icon: <FolderOutlined />, color: '#1890ff' },
-    local: { label: t('header.scopeLocal'), icon: <FolderOutlined />, color: '#8c8c8c' }
-  } as const;
   const isDisabled = plugin.installed && plugin.enabled === false;
-  const scopeInfo = plugin.scope ? scopeConfig[plugin.scope] : null;
 
-  // 根据市场源信息生成 URL
   const getMarketplaceUrl = (plugin: PluginDetailData): string | null => {
-    if (!plugin.marketplaceSource) {
-      return null;
-    }
-
+    if (!plugin.marketplaceSource) return null;
     const { source, repo, url } = plugin.marketplaceSource;
-
-    // GitHub 市场
-    if (source === 'github' && repo) {
-      return `https://github.com/${repo}`;
-    }
-
-    // URL 市场
-    if (source === 'url' && url) {
-      return url;
-    }
-
-    // Git 市场（如果有 URL）
-    if (source === 'git' && url) {
-      return url;
-    }
-
-    // Directory 类型是本地的，没有 URL
+    if (source === 'github' && repo) return `https://github.com/${repo}`;
+    if (source === 'url' && url) return url;
+    if (source === 'git' && url) return url;
     return null;
   };
 
-  // 生成市场标题提示
   const getMarketplaceTitle = (plugin: PluginDetailData): string => {
-    if (!plugin.marketplaceSource) {
-      return t('header.marketUnknown');
-    }
+    if (!plugin.marketplaceSource) return t('header.marketUnknown');
     const { source } = plugin.marketplaceSource;
-    if (source === 'directory') {
-      return t('header.marketLocal');
-    }
+    if (source === 'directory') return t('header.marketLocal');
     const url = getMarketplaceUrl(plugin);
     return url ? t('header.openMarketLink', url) : t('header.marketLocal');
   };
 
-  const handleUninstallWithConfirm = () => {
-    Modal.confirm({
-      title: t('header.uninstallConfirmTitle'),
-      content: t('header.uninstallConfirmContent', plugin.name),
-      okText: t('header.uninstall'),
-      okType: 'danger',
-      okButtonProps: { danger: true },
-      cancelText: t('header.cancel'),
-      onOk: onUninstall,
-    });
-  };
-
-  const installMenuItems: MenuProps['items'] = [
-    {
-      key: 'user',
-      label: t('header.installToUser'),
-      icon: <UserOutlined />,
-      onClick: () => onInstall('user')
-    },
-    {
-      key: 'project',
-      label: t('header.installToProject'),
-      icon: <FolderOutlined />,
-      onClick: () => onInstall('project')
-    }
-  ];
-
-
   return (
-    <div style={{ marginBottom: 24 }}>
-      <Flex justify="space-between" align="flex-start" gap={16} style={{ marginBottom: 12 }}>
-        <Space direction="vertical" size={4} style={{ flex: 1 }}>
-          <Space size="middle">
-            <Title level={3} style={{ margin: 0 }}>
-              {plugin.name}
-            </Title>
+    <div className="mb-6">
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <div className="space-y-1 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-bold m-0">{plugin.name}</h3>
             {plugin.localPath && onOpenDirectory && (
-              <Tooltip title={t('header.openPluginDir')}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<FolderOpenOutlined />}
-                  onClick={() => onOpenDirectory(plugin.localPath!)}
-                  style={{ fontSize: 16, padding: '0 4px' }}
-                />
-              </Tooltip>
+              <button
+                className="p-1 hover:bg-muted rounded transition-colors"
+                onClick={() => onOpenDirectory(plugin.localPath!)}
+                title={t('header.openPluginDir')}
+              >
+                <FolderOpen className="w-4 h-4" />
+              </button>
             )}
-            <Tag color="blue">v{plugin.version}</Tag>
-          </Space>
-          <Text type="secondary" style={{ fontSize: 13 }}>
+            <span className="px-2 py-0.5 text-xs font-medium rounded bg-badge-bg text-badge-fg">
+              v{plugin.version}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
             {plugin.author && `${t('header.author')}: ${plugin.author} · `}
             {t('header.from')}{' '}
-            <Text
-              style={{
-                cursor: getMarketplaceUrl(plugin) ? 'pointer' : 'default',
-                textDecoration: getMarketplaceUrl(plugin) ? 'underline' : 'none',
-                textDecorationStyle: getMarketplaceUrl(plugin) ? 'dashed' : 'solid',
-                textUnderlineOffset: 2
-              }}
+            <span
+              className={getMarketplaceUrl(plugin) ? 'cursor-pointer underline underline-dashed underline-offset-1' : ''}
               onClick={() => {
                 const marketplaceUrl = getMarketplaceUrl(plugin);
-                if (marketplaceUrl) {
-                  onOpenExternal(marketplaceUrl);
-                }
+                if (marketplaceUrl) onOpenExternal(marketplaceUrl);
               }}
               title={getMarketplaceTitle(plugin)}
             >
               {plugin.marketplace}
-            </Text>
+            </span>
             {plugin.repository?.stars && (
-              <span>
-                {' '}· <StarFilled style={{ color: '#faad14' }} /> {plugin.repository.stars}
-              </span>
+              <span> · <Star className="w-3 h-3 text-warning-fg inline" /> {plugin.repository.stars}</span>
             )}
-          </Text>
-        </Space>
+          </p>
+        </div>
 
-        <Space size="middle">
+        <div className="flex items-center gap-2">
           {plugin.repository?.url && (
-            <Tooltip title={t('header.openRepo')}>
-              <Button
-                type="text"
-                icon={<GithubOutlined />}
-                onClick={() => onOpenExternal(plugin.repository!.url)}
-              />
-            </Tooltip>
+            <button
+              className="p-1 hover:bg-muted rounded transition-colors"
+              onClick={() => onOpenExternal(plugin.repository!.url)}
+              title={t('header.openRepo')}
+            >
+              <Github className="w-4 h-4" />
+            </button>
           )}
           {plugin.homepage && plugin.homepage !== plugin.repository?.url && (
-            <Tooltip title={t('header.openHomepage')}>
-              <Button
-                type="text"
-                icon={<LinkOutlined />}
-                onClick={() => onOpenExternal(plugin.homepage!)}
-              />
-            </Tooltip>
+            <button
+              className="p-1 hover:bg-muted rounded transition-colors"
+              onClick={() => onOpenExternal(plugin.homepage!)}
+              title={t('header.openHomepage')}
+            >
+              <ExternalLink className="w-4 h-4" />
+            </button>
           )}
 
           {plugin.installed ? (
-            <Space size="small">
-              <Tooltip title={isDisabled ? t('header.enablePlugin') : t('header.disablePlugin')}>
-                <Switch
-                  checked={!isDisabled}
-                  onChange={(checked) => (checked ? onEnable() : onDisable())}
-                  size="small"
+            <>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!isDisabled}
+                aria-label={!isDisabled ? t('header.disablePlugin') : t('header.enablePlugin')}
+                title={!isDisabled ? t('header.disablePlugin') : t('header.enablePlugin')}
+                onClick={() => (!isDisabled ? onDisable() : onEnable())}
+                className={`relative inline-flex h-6 w-12 items-center rounded-full border shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-focus-border ${
+                  !isDisabled
+                    ? 'bg-green-500 border-green-400'
+                    : 'bg-muted border-border'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                    !isDisabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
                 />
-              </Tooltip>
-              {scopeInfo && (
-                <Tag
-                  icon={scopeInfo.icon}
-                  style={{
-                    borderRadius: 12,
-                    padding: '2px 10px',
-                    background: `${scopeInfo.color}15`,
-                    color: scopeInfo.color,
-                    border: `1px solid ${scopeInfo.color}30`
-                  }}
-                >
-                  {scopeInfo.label}
-                </Tag>
+              </button>
+              {plugin.scope && (
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-success-fg/10 text-success-fg border border-success-fg/30">
+                  {plugin.scope === 'user' ? <User className="w-3 h-3 inline mr-1" /> : <Folder className="w-3 h-3 inline mr-1" />}
+                  {plugin.scope === 'user' ? t('header.scopeUser') : t('header.scopeProject')}
+                </span>
               )}
-              <Tooltip title={t('header.uninstallBtn')}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  onClick={handleUninstallWithConfirm}
-                />
-              </Tooltip>
-            </Space>
+              <button
+                className="p-1 hover:bg-error-fg/10 rounded transition-colors text-error-fg"
+                onClick={onUninstall}
+                title={t('header.uninstallBtn')}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
           ) : (
-            <Dropdown.Button
-              menu={{ items: installMenuItems }}
-              icon={<DownloadOutlined />}
-              onClick={() => onInstall('user')}
-              type="primary"
-              size="small"
-            >
-              {t('header.install')}
-            </Dropdown.Button>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="secondary" onClick={() => onInstall('user')}>
+                <Download className="w-3 h-3 mr-1" />
+                {t('header.install')}
+              </Button>
+            </div>
           )}
-        </Space>
-      </Flex>
+        </div>
+      </div>
 
-      <Divider style={{ margin: '12px 0' }} />
+      <div className="h-px bg-border" />
     </div>
   );
-};
-
-export default DetailHeader;
+}

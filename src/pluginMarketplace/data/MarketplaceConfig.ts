@@ -54,6 +54,32 @@ export const BUILTIN_MARKETPLACES: BuiltinMarketplace[] = [
     featured: true
   },
   {
+    id: 'pleaseai/claude-code-plugins',
+    name: 'claude-code-plugins',
+    displayName: 'PleaseAI 插件市场',
+    displayNameEn: 'PleaseAI Plugin Marketplace',
+    description: 'PleaseAI 维护的 Claude Code 插件市场集合，包含开发、评审与安全等常见场景插件',
+    descriptionEn: 'Marketplace curated by PleaseAI, covering development, review, and security plugin workflows',
+    source: 'pleaseai/claude-code-plugins',
+    url: 'https://github.com/pleaseai/claude-code-plugins',
+    icon: '🧰',
+    category: 'community',
+    featured: false
+  },
+  {
+    id: '2389-research/claude-plugins',
+    name: 'claude-plugins',
+    displayName: '2389 Research 插件市场',
+    displayNameEn: '2389 Research Plugin Marketplace',
+    description: '2389 Research 发布的 Claude Code 插件与 MCP 工具集合，偏向工程化开发流程',
+    descriptionEn: 'Claude Code plugins and MCP tooling from 2389 Research, focused on engineering workflows',
+    source: '2389-research/claude-plugins',
+    url: 'https://github.com/2389-research/claude-plugins',
+    icon: '🔌',
+    category: 'community',
+    featured: false
+  },
+  {
     id: 'yamadashy/repomix',
     name: 'repomix',
     displayName: 'Repomix 官方插件',

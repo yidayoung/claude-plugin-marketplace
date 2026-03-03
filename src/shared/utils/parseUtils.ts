@@ -72,13 +72,28 @@ export function parseFrontmatter(content: string): Record<string, any> | null {
 }
 
 /**
- * 解析值 - 统一返回字符串
+ * 解析值
+ * - 支持布尔值
+ * - 支持 YAML 风格数组（- item）
+ * - 其他值返回字符串
  */
-function parseValue(value: string): string {
+function parseValue(value: string): any {
   if (!value) return '';
 
   // 去掉首尾空行
   value = value.replace(/^\n+|\n+$/g, '');
+
+  // YAML 风格数组
+  if (value.includes('\n') && value.split('\n').every(line => line.trim().startsWith('- '))) {
+    return value
+      .split('\n')
+      .map(line => line.trim().replace(/^- /, '').trim())
+      .filter(Boolean);
+  }
+
+  // 布尔值
+  if (value === 'true') return true;
+  if (value === 'false') return false;
 
   // 去掉引号包裹
   if ((value.startsWith('"') && value.endsWith('"')) ||

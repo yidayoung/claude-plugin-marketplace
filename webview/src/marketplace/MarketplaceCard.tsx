@@ -1,25 +1,24 @@
-// vscode-extension/webview/src/marketplace/MarketplaceCard.tsx
-
-import { Button, Typography, Tag, Card, Flex } from 'antd';
-import { DeleteOutlined, PlusOutlined, GithubOutlined, StarOutlined, LinkOutlined } from '@ant-design/icons';
+import {
+  Star,
+  Github,
+  ExternalLink,
+  Trash2,
+  Plus,
+  Loader2,
+  CheckCircle2,
+  ShieldCheck,
+  Users,
+  FlaskConical
+} from 'lucide-react';
 import { useL10n } from '@/l10n';
 import { MARKETPLACE_CATEGORIES, type LocalizedMarketplace } from './config';
-import { getVSCodeColors, type VSCodeTheme } from './useVSCodeTheme';
-
-const { Text, Paragraph } = Typography;
+import { type VSCodeTheme } from './useVSCodeTheme';
+import { formatStars, shouldDisplayStars } from './marketplaceMatching';
 
 // 声明全局 vscode API
 declare const vscode: {
   postMessage: (message: any) => void;
 };
-
-// 格式化星数显示
-function formatStars(stars: number): string {
-  if (stars >= 1000) {
-    return (stars / 1000).toFixed(1) + 'k';
-  }
-  return stars.toString();
-}
 
 interface MarketplaceCardProps {
   market: LocalizedMarketplace;
@@ -32,10 +31,13 @@ interface MarketplaceCardProps {
 
 export function MarketplaceCard({ market, isAdded, isLoading, theme, onAdd, onRemove }: MarketplaceCardProps) {
   const { t, locale } = useL10n();
-  const colors = getVSCodeColors(theme);
   const categoryConfig = MARKETPLACE_CATEGORIES[market.category || 'community' as keyof typeof MARKETPLACE_CATEGORIES];
+  const CategoryIcon = market.category === 'official'
+    ? ShieldCheck
+    : market.category === 'experimental'
+      ? FlaskConical
+      : Users;
 
-  // 获取本地化的分类标签
   const getCategoryLabel = (): string => {
     if (locale === 'zh-cn') {
       return categoryConfig.label;
@@ -51,163 +53,97 @@ export function MarketplaceCard({ market, isAdded, isLoading, theme, onAdd, onRe
   };
 
   return (
-    <Card
-      size="small"
+    <div
+      className="flex h-full flex-col rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg"
       style={{
-        borderColor: colors.cardBorder,
-        background: colors.cardBackground,
-        boxShadow: colors.shadow,
-        transition: 'all 0.2s ease',
-        position: 'relative',
-        overflow: 'hidden',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-      styles={{
-        body: { padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = colors.shadowHover;
-        e.currentTarget.style.borderColor = categoryConfig.color + '60';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = colors.shadow;
-        e.currentTarget.style.borderColor = colors.cardBorder;
+        borderTopWidth: '3px',
+        borderTopColor: categoryConfig.color
       }}
     >
-      {/* 顶部装饰条 */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '3px',
-          background: categoryConfig.color
-        }}
-      />
-
-      {/* 精选标签 */}
-      {market.featured && (
-        <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
-          <Tag
-            icon={<StarOutlined />}
-            color={categoryConfig.color}
-            style={{ margin: 0, fontSize: '10px', padding: '2px 6px' }}
-          >
-            {t('marketplace.discover.featured')}
-          </Tag>
-        </div>
-      )}
-
-      {/* 主内容区 */}
-      <div style={{ marginTop: market.featured ? '12px' : '8px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* 图标和名称行 */}
-        <Flex justify="space-between" align="start" style={{ marginBottom: '8px' }}>
-          <Flex align="center" gap="small" style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
-                background: categoryConfig.color + '20',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '20px',
-                flexShrink: 0
-              }}
-            >
-              {market.icon}
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold text-foreground">{market.displayName}</h3>
+          {shouldDisplayStars(market.stars) && (
+            <div className="mt-1 flex items-center gap-1 text-xs text-text-secondary">
+              <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+              <span>{formatStars(market.stars)} stars</span>
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <Text strong style={{ fontSize: '14px' }} ellipsis={{ tooltip: market.displayName }}>
-                {market.displayName}
-              </Text>
-              {market.stars !== undefined && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                  <StarOutlined style={{ fontSize: '11px', color: '#F59E0B' }} />
-                  <Text type="secondary" style={{ fontSize: '11px' }}>
-                    {formatStars(market.stars)}
-                  </Text>
-                </div>
-              )}
-            </div>
-          </Flex>
-
-          {/* GitHub 链接图标 */}
-          <Button
-            type="text"
-            icon={<GithubOutlined />}
-            onClick={handleOpenUrl}
-            style={{ color: colors.textSecondary, flexShrink: 0 }}
-            title={market.url}
-          />
-        </Flex>
-
-        {/* 分类标签 */}
-        <div style={{ marginBottom: '8px' }}>
-          <Tag color={categoryConfig.color} style={{ margin: 0, fontSize: '10px' }}>
-            {categoryConfig.icon} {getCategoryLabel()}
-          </Tag>
-        </div>
-
-        {/* 描述 */}
-        <Paragraph
-          type="secondary"
-          style={{
-            margin: '0 0 12px 0',
-            fontSize: '12px',
-            minHeight: '40px',
-            maxHeight: '40px',
-            lineHeight: '20px'
-          }}
-          ellipsis={{ rows: 2 }}
-        >
-          {market.description}
-        </Paragraph>
-
-        {/* 操作按钮 */}
-        <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
-          <Button
-            size="small"
-            icon={<LinkOutlined />}
-            onClick={handleOpenUrl}
-            style={{ flex: 1 }}
-          >
-            View
-          </Button>
-          {isAdded ? (
-            <Button
-              size="small"
-              icon={<DeleteOutlined />}
-              loading={isLoading}
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove(market.name);
-              }}
-              style={{ flex: 1 }}
-            >
-              {t('marketplace.discover.uninstallButton')}
-            </Button>
-          ) : (
-            <Button
-              type="primary"
-              size="small"
-              icon={<PlusOutlined />}
-              loading={isLoading}
-              onClick={(e) => {
-                e.stopPropagation();
-                onAdd(market.source, market.name);
-              }}
-              style={{ flex: 1 }}
-            >
-              {t('marketplace.discover.addButton')}
-            </Button>
           )}
         </div>
+        <button
+          className="rounded-md p-2 text-text-secondary transition-colors hover:bg-hover-bg hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          onClick={handleOpenUrl}
+          title={market.url}
+          aria-label={`View ${market.displayName} on GitHub`}
+        >
+          <Github className="h-4 w-4" />
+        </button>
       </div>
-    </Card>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span
+          className="inline-flex min-h-7 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium"
+          style={{
+            backgroundColor: `${categoryConfig.color}1A`,
+            borderColor: `${categoryConfig.color}4D`,
+            color: categoryConfig.color
+          }}
+        >
+          {CategoryIcon && <CategoryIcon className="h-3.5 w-3.5" />}
+          {getCategoryLabel()}
+        </span>
+        {market.featured && (
+          <span className="inline-flex min-h-7 items-center gap-1 rounded-md border border-amber-300 bg-amber-100/60 px-2 py-1 text-xs font-medium text-amber-800">
+            <Star className="h-3.5 w-3.5 fill-amber-600 text-amber-600" />
+            {t('marketplace.discover.featured')}
+          </span>
+        )}
+        {isAdded && (
+          <span className="inline-flex min-h-7 items-center gap-1 rounded-md border border-green-400/50 bg-green-500/10 px-2 py-1 text-xs font-medium text-green-400">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {t('marketplace.discover.addedButton')}
+          </span>
+        )}
+      </div>
+
+      <p className="mb-4 line-clamp-2 min-h-[2.5rem] text-sm leading-6 text-text-secondary">
+        {market.description}
+      </p>
+
+      <div className="mt-auto flex gap-2">
+        <button
+          onClick={handleOpenUrl}
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-hover-bg focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <ExternalLink className="h-4 w-4" />
+          {t('marketplace.discover.viewButton')}
+        </button>
+        {isAdded ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove(market.name);
+            }}
+            disabled={isLoading}
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+          >
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            {t('marketplace.discover.removeButton')}
+          </button>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd(market.source, market.name);
+            }}
+            disabled={isLoading}
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-btn-bg px-3 py-2 text-sm font-medium text-btn-fg transition-colors hover:bg-btn-hover focus:outline-none focus:ring-2 focus:ring-focus-border disabled:opacity-50"
+          >
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {t('marketplace.discover.addButton')}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

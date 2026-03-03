@@ -1,12 +1,8 @@
-// vscode-extension/webview/src/marketplace/MarketplaceSection.tsx
-
-import { Row, Col, Typography } from 'antd';
-import { type VSCodeTheme, getVSCodeColors } from './useVSCodeTheme';
+import { type VSCodeTheme } from './useVSCodeTheme';
 import { MarketplaceCard } from './MarketplaceCard';
 import { type RecommendedMarketplace } from './config';
 import type { ReactNode } from 'react';
-
-const { Text } = Typography;
+import { isMarketplaceAdded } from './marketplaceMatching';
 
 interface MarketplaceSectionProps {
   title: string;
@@ -31,70 +27,44 @@ export function MarketplaceSection({
   onAdd,
   onRemove
 }: MarketplaceSectionProps) {
-  const colors = getVSCodeColors(theme);
-
-  const isMarketplaceAdded = (market: RecommendedMarketplace): boolean => {
-    // 尝试多种可能的名称匹配方式
-    const possibleNames: string[] = [];
-
-    // 1. 配置中的 name 字段
-    if (market.name) {
-      possibleNames.push(market.name);
-    }
-
-    // 2. 从 source 提取的 repo 部分 (owner/repo -> repo)
-    if (market.source.includes('/')) {
-      const repoPart = market.source.split('/').pop()!;
-      possibleNames.push(repoPart);
-
-      // 3. 从 source 提取的 owner 部分 (owner/repo -> owner)
-      const ownerPart = market.source.split('/')[0];
-      possibleNames.push(ownerPart);
-    } else {
-      possibleNames.push(market.source);
-    }
-
-    // 4. 从 id 提取 (对于 id 格式为 owner/repo 的情况)
-    if (market.id.includes('/')) {
-      const ownerFromId = market.id.split('/')[0];
-      const repoFromId = market.id.split('/')[1];
-      possibleNames.push(ownerFromId);
-      possibleNames.push(repoFromId);
-    }
-
-    // 检查是否有任何匹配
-    return possibleNames.some(name => name && addedMarketplaces.has(name));
-  };
+  if (markets.length === 0) {
+    return null;
+  }
 
   return (
-    <div style={{ marginBottom: '32px' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '16px'
-      }}>
-        <span style={{ color: iconColor, fontSize: '16px', display: 'flex', alignItems: 'center' }}>
-          {icon}
-        </span>
-        <Text strong style={{ fontSize: '15px', color: colors.textPrimary }}>
-          {title}
-        </Text>
+    <section className="mb-10">
+      <div className="mb-4 flex items-center gap-3">
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-white"
+          style={{ backgroundColor: iconColor }}
+        >
+          <span className="text-sm">{icon}</span>
+        </div>
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <div className="h-px flex-1 bg-border" />
+        <div className="rounded-md border border-border bg-background px-2 py-1 text-xs text-text-secondary">
+          {markets.length} markets
+        </div>
       </div>
-      <Row gutter={[12, 12]}>
-        {markets.map(market => (
-          <Col key={market.id} xs={24} sm={12} lg={8}>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {markets.map((market, index) => (
+          <div
+            key={market.id}
+            className="opacity-0 animate-fade-in"
+            style={{ animationDelay: `${index * 75}ms`, animationFillMode: 'forwards' }}
+          >
             <MarketplaceCard
               market={market}
-              isAdded={isMarketplaceAdded(market)}
+              isAdded={isMarketplaceAdded(market, addedMarketplaces)}
               isLoading={loading === market.name}
               theme={theme}
               onAdd={onAdd}
               onRemove={onRemove}
             />
-          </Col>
+          </div>
         ))}
-      </Row>
-    </div>
+      </div>
+    </section>
   );
 }

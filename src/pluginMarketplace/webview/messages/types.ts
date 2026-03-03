@@ -22,6 +22,7 @@ export type WebviewMessageType =
   | 'refresh'
   | 'addMarketplace'
   | 'addRecommendedMarketplace'
+  | 'refreshMarketplaceStars'
   | 'removeMarketplace'
   | 'updateMarketplace'
   | 'executeCommand'

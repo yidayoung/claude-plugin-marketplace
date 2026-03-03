@@ -1,20 +1,20 @@
-// vscode-extension/webview/src/marketplace/MarketplaceApp.tsx
-
 import { useState, useEffect, useMemo } from 'react';
-import { message } from 'antd';
-import { StarOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { Star, Zap } from 'lucide-react';
 import { useL10n } from '@/l10n';
-import { useVSCodeTheme, getVSCodeColors } from './useVSCodeTheme';
+import { useVSCodeTheme } from './useVSCodeTheme';
 import { MarketplaceHeader } from './MarketplaceHeader';
 import { CustomMarketInput } from './CustomMarketInput';
 import { MarketplaceSection } from './MarketplaceSection';
+import { MarketplaceSkeleton } from './MarketplaceSkeleton';
+import { MarketplaceEmptyState } from './MarketplaceEmptyState';
 import type { LocalizedMarketplace } from './config';
+import { logger } from '@/shared/utils/logger';
 
 interface MarketplaceListMessage {
   type: 'marketplaceList';
   payload: {
-    marketplaces: Array<{ name: string; stars: number }>;
-    builtinStars?: Record<string, number>;  // 所有内置市场的 stars（包括未安装的）
+    marketplaces: Array<{ name: string; stars?: number }>;
+    builtinStars?: Record<string, number | undefined>;
   };
 }
 
@@ -25,18 +25,30 @@ interface BuiltinMarketsMessage {
   };
 }
 
-function MarketplaceApp() {
+interface ErrorMessage {
+  type: 'error';
+  payload?: {
+    message?: string;
+  };
+}
+
+// 声明全局 vscode API
+declare const vscode: {
+  postMessage: (message: any) => void;
+};
+
+export default function MarketplaceApp() {
   const { t, locale } = useL10n();
   const [inputValue, setInputValue] = useState('');
   const [addedMarketplaces, setAddedMarketplaces] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [builtinMarkets, setBuiltinMarkets] = useState<LocalizedMarketplace[]>([]);
-  // 后端提供的 stars 数据 (marketplaceName -> stars)
-  const [serverStars, setServerStars] = useState<Record<string, number>>({});
+  const [serverStars, setServerStars] = useState<Partial<Record<string, number>>>({});
+  const [refreshingStars, setRefreshingStars] = useState(false);
   const theme = useVSCodeTheme();
-  const colors = getVSCodeColors(theme);
 
-  // 从内置市场列表中提取精选和全部市场，并合并后端的 stars 数据
   const featuredMarkets = useMemo(() => {
     return builtinMarkets
       .filter(m => m.featured)
@@ -53,7 +65,6 @@ function MarketplaceApp() {
     }));
   }, [builtinMarkets, serverStars]);
 
-  // 本地化市场
   const localizedFeaturedMarkets = useMemo(() =>
     featuredMarkets.map(m => ({
       ...m,
@@ -72,97 +83,129 @@ function MarketplaceApp() {
     [allMarkets, locale]
   );
 
-  // 监听来自 extension 的消息
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      console.log('[MarketplaceApp] Received message:', event.data);
-      const msg = event.data as MarketplaceListMessage | BuiltinMarketsMessage;
+      logger.debug('[MarketplaceApp] Received message:', event.data);
+      const msg = event.data as MarketplaceListMessage | BuiltinMarketsMessage | ErrorMessage;
 
       if (msg.type === 'marketplaceList') {
-        console.log('[MarketplaceApp] marketplaceList:', msg.payload);
-        // 从新的格式中提取市场名称和 stars
+        logger.debug('[MarketplaceApp] marketplaceList:', msg.payload);
         const marketplaceNames = new Set(msg.payload.marketplaces.map(m => m.name));
-        const stars: Record<string, number> = {};
+        const stars: Partial<Record<string, number>> = {};
         msg.payload.marketplaces.forEach(m => {
-          stars[m.name] = m.stars;
+          if (typeof m.stars === 'number') {
+            stars[m.name] = m.stars;
+          }
         });
 
-        // 合并内置市场的 stars 数据（包括未安装的市场）
         if (msg.payload.builtinStars) {
-          Object.assign(stars, msg.payload.builtinStars);
+          for (const [name, value] of Object.entries(msg.payload.builtinStars)) {
+            if (typeof value === 'number') {
+              stars[name] = value;
+            }
+          }
         }
 
         setAddedMarketplaces(marketplaceNames);
         setServerStars(stars);
-        // 清除所有 loading 状态，因为操作已完成
         setLoading(null);
+        setRefreshingStars(false);
       }
 
       if (msg.type === 'builtinMarkets') {
-        console.log('[MarketplaceApp] builtinMarkets:', msg.payload.markets?.length);
-        setBuiltinMarkets(msg.payload.markets);
+        logger.debug('[MarketplaceApp] builtinMarkets:', msg.payload.markets?.length);
+        setBuiltinMarkets(msg.payload.markets || []);
+        setInitialLoading(false);
+        setError(null);
+      }
+
+      if (msg.type === 'error') {
+        setRefreshingStars(false);
       }
     };
 
     window.addEventListener('message', handleMessage);
 
-    // 发送 ready 消息通知 extension 已准备好
-    console.log('[MarketplaceApp] Sending ready message');
-    window.vscode.postMessage({ type: 'ready' });
+    logger.debug('[MarketplaceApp] Sending ready message');
+    if (vscode) {
+      vscode.postMessage({ type: 'ready' });
+    }
 
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
+    // Set a timeout for initial loading
+    const timeoutId = setTimeout(() => {
+      if (initialLoading) {
+        setError('timeout');
+        setInitialLoading(false);
+      }
+    }, 10000); // 10 second timeout
 
-  // 添加自定义市场
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      clearTimeout(timeoutId);
+    };
+  }, [initialLoading]);
+
   const handleAddMarketplace = () => {
     const source = inputValue.trim();
     if (!source) {
-      message.warning(t('marketplace.discover.inputPlaceholder'));
+      alert(t('marketplace.discover.inputPlaceholder'));
       return;
     }
 
     setLoading('custom');
-    window.vscode.postMessage({
-      type: 'addMarketplace',
-      payload: { source }
-    });
+    if (vscode) {
+      vscode.postMessage({
+        type: 'addMarketplace',
+        payload: { source }
+      });
+    }
     setInputValue('');
-    // loading 会在收到 marketplaceList 消息后清除
   };
 
-  // 添加推荐市场
   const handleAddRecommended = (source: string, name: string) => {
     setLoading(name);
-    window.vscode.postMessage({
-      type: 'addRecommendedMarketplace',
-      payload: { source }
-    });
-    // loading 会在收到 marketplaceList 消息后清除
+    if (vscode) {
+      vscode.postMessage({
+        type: 'addRecommendedMarketplace',
+        payload: { source }
+      });
+    }
   };
 
-  // 卸载市场
   const handleRemoveMarketplace = (marketName: string) => {
     setLoading(marketName);
-    window.vscode.postMessage({
-      type: 'removeMarketplace',
-      payload: { marketplaceName: marketName }
-    });
-    // loading 会在收到 marketplaceList 消息后清除
+    if (vscode) {
+      vscode.postMessage({
+        type: 'removeMarketplace',
+        payload: { marketplaceName: marketName }
+      });
+    }
   };
 
   return (
-    <div style={{
-      padding: '24px',
-      maxWidth: '1100px',
-      margin: '0 auto',
-      background: colors.background,
-      minHeight: '100vh'
-    }}>
-      {/* 页头 */}
-      <MarketplaceHeader theme={theme} />
+    <div className="mx-auto min-h-screen max-w-[1200px] bg-background p-4 md:p-6">
+      <a
+        href="#marketplace-main"
+        className="absolute -left-[9999px] top-2 z-50 rounded-md bg-primary px-3 py-2 text-primary-fg focus:left-2"
+      >
+        Skip to content
+      </a>
 
-      {/* 自定义市场添加 */}
-      <div style={{ marginBottom: '24px' }}>
+      <MarketplaceHeader
+        theme={theme}
+        totalMarkets={localizedAllMarkets.length}
+        addedMarkets={addedMarketplaces.size}
+        isRefreshingStars={refreshingStars}
+        onRefreshStars={() => {
+          setRefreshingStars(true);
+          if (vscode) {
+            vscode.postMessage({ type: 'refreshMarketplaceStars' });
+          }
+        }}
+      />
+
+      <main id="marketplace-main">
+      <div className="mb-6">
         <CustomMarketInput
           value={inputValue}
           onChange={setInputValue}
@@ -172,33 +215,63 @@ function MarketplaceApp() {
         />
       </div>
 
-      {/* 精选市场 */}
-      <MarketplaceSection
-        title={t('marketplace.discover.featuredMarkets')}
-        icon={<StarOutlined />}
-        iconColor="#F59E0B"
-        markets={localizedFeaturedMarkets}
-        theme={theme}
-        addedMarketplaces={addedMarketplaces}
-        loading={loading}
-        onAdd={handleAddRecommended}
-        onRemove={handleRemoveMarketplace}
-      />
+      {initialLoading && (
+        <MarketplaceSkeleton count={6} theme={theme} />
+      )}
 
-      {/* 全部市场 */}
-      <MarketplaceSection
-        title={t('marketplace.discover.allMarkets')}
-        icon={<ThunderboltOutlined />}
-        iconColor="#7C3AED"
-        markets={localizedAllMarkets}
-        theme={theme}
-        addedMarketplaces={addedMarketplaces}
-        loading={loading}
-        onAdd={handleAddRecommended}
-        onRemove={handleRemoveMarketplace}
-      />
+      {error && !initialLoading && (
+        <MarketplaceEmptyState
+          type="error"
+          theme={theme}
+          onRetry={() => {
+            setError(null);
+            setInitialLoading(true);
+            if (vscode) {
+              vscode.postMessage({ type: 'ready' });
+            }
+          }}
+        />
+      )}
+
+      {!initialLoading && !error && (
+        <>
+          {localizedFeaturedMarkets.length > 0 ? (
+            <MarketplaceSection
+              title={t('marketplace.discover.featuredMarkets')}
+              icon={<Star className="w-4 h-4" />}
+              iconColor="#F59E0B"
+              markets={localizedFeaturedMarkets}
+              theme={theme}
+              addedMarketplaces={addedMarketplaces}
+              loading={loading}
+              onAdd={handleAddRecommended}
+              onRemove={handleRemoveMarketplace}
+            />
+          ) : (
+            !initialLoading && (
+              <MarketplaceEmptyState
+                type="no-markets"
+                theme={theme}
+              />
+            )
+          )}
+
+          {localizedAllMarkets.length > 0 ? (
+            <MarketplaceSection
+              title={t('marketplace.discover.allMarkets')}
+              icon={<Zap className="w-4 h-4" />}
+              iconColor="#7C3AED"
+              markets={localizedAllMarkets}
+              theme={theme}
+              addedMarketplaces={addedMarketplaces}
+              loading={loading}
+              onAdd={handleAddRecommended}
+              onRemove={handleRemoveMarketplace}
+            />
+          ) : null}
+        </>
+      )}
+      </main>
     </div>
   );
 }
-
-export default MarketplaceApp;

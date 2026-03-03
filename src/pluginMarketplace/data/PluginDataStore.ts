@@ -2,6 +2,7 @@
 
 import * as vscode from 'vscode';
 import { DataLoader } from './DataLoader';
+import { BUILTIN_MARKETPLACES } from './MarketplaceConfig';
 import {
   MarketplaceInfo,
   PluginInfo,
@@ -25,6 +26,8 @@ interface StarsCacheEntry {
   timestamp: number;
 }
 
+export const MARKETPLACE_STARS_TTL_MS = 24 * 60 * 60 * 1000;
+
 /**
  * 插件数据存储
  * 单一数据源，管理所有插件数据
@@ -37,8 +40,14 @@ export class PluginDataStore {
   private pluginDetails = new Map<string, DetailCacheEntry>(); // "name@marketplace" -> detail
   private pendingRequests = new Map<string, Promise<any>>();
 
-  // Stars 缓存 (marketplace -> stars)
-  private marketplaceStars = new Map<string, StarsCacheEntry>();
+  // Stars 缓存 (repoKey -> stars)
+  private marketplaceStarsByRepo = new Map<string, StarsCacheEntry>();
+  // 市场到仓库映射 (marketplace -> repoKey)
+  private marketplaceRepoIndex = new Map<string, string>();
+  // 兼容旧缓存结构 (marketplace -> stars)
+  private legacyMarketplaceStarsByName = new Map<string, StarsCacheEntry>();
+  // repo 维度请求去重
+  private pendingStarRequests = new Map<string, Promise<number | undefined>>();
 
   // 缓存配置
   private readonly DETAIL_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
@@ -71,6 +80,9 @@ export class PluginDataStore {
       this.dataLoader.loadInstalledPlugins(),
     ]);
 
+    logger.debug(`[PluginDataStore] 加载了 ${marketplaces.length} 个市场: ${marketplaces.map(m => m.name).join(', ')}`);
+    logger.debug(`[PluginDataStore] 加载了 ${installedPlugins.length} 个已安装插件`);
+
     // 使用 forEach 简化循环
     marketplaces.forEach(m => this.marketplaces.set(m.name, m));
     installedPlugins.forEach(p => {
@@ -81,13 +93,16 @@ export class PluginDataStore {
         scope: p.scope,
         installedVersion: p.version,  // 存储已安装版本
       });
+      logger.debug(`[PluginDataStore] 已安装插件: ${key}, enabled=${p.enabled}, scope=${p.scope}`);
     });
 
+    // 必须先加载插件列表，再同步安装状态，否则会出现初始化时序竞争
     await this.loadAllPluginLists();
     this.syncInstalledStatus();
-
-    // 修复：对于没有正确 marketplace 的已安装插件，从 pluginList 中查找并更新
     this.fixInstalledPluginsMarketplace();
+
+    // 建立市场与 repo 的映射索引，供 stars 查询使用
+    this.rebuildMarketplaceRepoIndex();
 
     // 后台异步刷新所有市场的 stars 数据
     this.refreshAllMarketplaceStars();
@@ -103,10 +118,22 @@ export class PluginDataStore {
     try {
       const cached = this.context.globalState.get<Record<string, StarsCacheEntry>>(this.STARS_CACHE_KEY);
       if (cached) {
-        for (const [marketplace, entry] of Object.entries(cached)) {
-          this.marketplaceStars.set(marketplace, entry);
+        for (const [key, entry] of Object.entries(cached)) {
+          if (!entry || typeof entry.stars !== 'number' || typeof entry.timestamp !== 'number') {
+            continue;
+          }
+
+          if (key.includes('/')) {
+            this.marketplaceStarsByRepo.set(this.normalizeRepoKey(key), entry);
+            continue;
+          }
+
+          // 旧版本 marketplace 名称键值，作为兜底读取
+          this.legacyMarketplaceStarsByName.set(key, entry);
         }
-        logger.debug(`[PluginDataStore] 加载了 ${this.marketplaceStars.size} 个市场的 stars 缓存`);
+        logger.debug(
+          `[PluginDataStore] stars cache loaded: repo=${this.marketplaceStarsByRepo.size}, legacy=${this.legacyMarketplaceStarsByName.size}`
+        );
       }
     } catch (error) {
       logger.error('[PluginDataStore] 加载 stars 缓存失败:', error);
@@ -119,8 +146,8 @@ export class PluginDataStore {
   private saveStarsCache(): void {
     try {
       const obj: Record<string, StarsCacheEntry> = {};
-      for (const [marketplace, entry] of this.marketplaceStars.entries()) {
-        obj[marketplace] = entry;
+      for (const [repoKey, entry] of this.marketplaceStarsByRepo.entries()) {
+        obj[repoKey] = entry;
       }
       this.context.globalState.update(this.STARS_CACHE_KEY, obj);
     } catch (error) {
@@ -131,109 +158,144 @@ export class PluginDataStore {
   /**
    * 获取市场的 stars 数（从缓存或实时获取）
    */
-  getMarketplaceStars(marketplace: string): number {
-    const cached = this.marketplaceStars.get(marketplace);
-    return cached?.stars ?? 0;
+  getMarketplaceStars(marketplace: string): number | undefined {
+    const repoKey = this.marketplaceRepoIndex.get(marketplace);
+    if (repoKey) {
+      return this.marketplaceStarsByRepo.get(repoKey)?.stars;
+    }
+
+    return this.legacyMarketplaceStarsByName.get(marketplace)?.stars;
   }
 
   /**
    * 后台异步刷新所有市场的 stars 数据
    * 包括已安装市场和内置推荐市场
    */
-  private async refreshAllMarketplaceStars(): Promise<void> {
-    const markets = Array.from(this.marketplaces.values());
-    logger.debug(`[PluginDataStore] 开始刷新 ${markets.length} 个已安装市场的 stars 数据`);
+  private async refreshAllMarketplaceStars(force: boolean = false): Promise<void> {
+    this.rebuildMarketplaceRepoIndex();
 
-    // 并行获取已安装市场的 stars，但不阻塞初始化
-    const promises = markets.map(market => this.refreshMarketplaceStars(market.name, market.source));
-    await Promise.allSettled(promises);
+    const repoKeys = new Set(this.marketplaceRepoIndex.values());
+    const staleRepoKeys = Array.from(repoKeys).filter(repoKey =>
+      this.isStarsCacheStale(this.marketplaceStarsByRepo.get(repoKey))
+    );
+    const targetRepoKeys = force ? Array.from(repoKeys) : staleRepoKeys;
+    const freshRepoCount = repoKeys.size - staleRepoKeys.length;
 
-    // 刷新内置推荐市场的 stars（包括未安装的）
-    await this.refreshBuiltinMarketplaceStars();
+    logger.debug(
+      `[PluginDataStore] stars refresh check: totalRepo=${repoKeys.size}, staleRepo=${staleRepoKeys.length}, freshRepo=${freshRepoCount}, force=${force}`
+    );
 
-    // 刷新完成后触发市场变更事件，通知前端更新显示
-    this.notifyMarketplaceChange();
-
-    logger.debug('[PluginDataStore] 所有市场的 stars 数据刷新完成');
-  }
-
-  /**
-   * 刷新内置推荐市场的 stars 数据
-   * 使用内置配置中的 source（owner/repo 格式）
-   */
-  private async refreshBuiltinMarketplaceStars(): Promise<void> {
-    // 动态导入 BUILTIN_MARKETPLACES 避免循环依赖
-    const { BUILTIN_MARKETPLACES } = await import('../data/MarketplaceConfig');
-
-    logger.debug(`[PluginDataStore] 开始刷新 ${BUILTIN_MARKETPLACES.length} 个内置市场的 stars 数据`);
-
-    const promises = BUILTIN_MARKETPLACES.map(async (builtin) => {
-      // 检查是否已经有缓存的 stars（避免重复请求）
-      if (this.marketplaceStars.has(builtin.name)) {
-        return;
-      }
-
-      // 从内置配置的 source 字段提取 owner/repo
-      // source 格式: "owner/repo"
-      const source = builtin.source;
-      if (!source || !source.includes('/')) {
-        logger.debug(`[PluginDataStore] 内置市场 ${builtin.name} 的 source 无效: ${source}`);
-        return;
-      }
-
-      const [owner, repo] = source.split('/');
-      try {
-        const stars = await this.dataLoader.fetchGitHubStars(owner, repo);
-
-        // 更新缓存
-        this.marketplaceStars.set(builtin.name, {
-          stars,
-          timestamp: Date.now(),
-        });
-
-        logger.debug(`[PluginDataStore] 内置市场 ${builtin.name} stars: ${stars}`);
-      } catch (error) {
-        logger.error(`[PluginDataStore] 获取内置市场 ${builtin.name} 的 stars 失败:`, error);
-      }
-    });
-
-    await Promise.allSettled(promises);
-
-    // 保存到持久化存储
-    this.saveStarsCache();
-  }
-
-  /**
-   * 刷新单个市场的 stars 数据
-   * @param marketplaceName 市场名称
-   * @param source 市场源（MarketplaceSource 对象）
-   */
-  private async refreshMarketplaceStars(marketplaceName: string, source: any): Promise<void> {
-    // 使用统一函数提取 owner/repo
-    const ownerRepo = extractGitHubOwnerRepo(source);
-
-    if (!ownerRepo) {
-      logger.debug(`[PluginDataStore] ${marketplaceName} 不是 GitHub 类型的市场，跳过 stars 刷新`);
+    if (targetRepoKeys.length === 0) {
+      logger.debug('[PluginDataStore] stars refresh skipped: no stale repos');
       return;
     }
 
-    const [owner, repo] = ownerRepo.split('/');
-    try {
-      const stars = await this.dataLoader.fetchGitHubStars(owner, repo.replace('.git', ''));
+    let updatedCount = 0;
+    const batchSize = 15; // 提升批量大小以优化性能
+    for (let i = 0; i < targetRepoKeys.length; i += batchSize) {
+      const batch = targetRepoKeys.slice(i, i + batchSize);
+      const results = await Promise.allSettled(
+        batch.map(async (repoKey) => {
+          logger.debug(`[PluginDataStore] fetching stars for repo=${repoKey}`);
+          const stars = await this.fetchRepoStarsWithDedup(repoKey);
+          if (stars === undefined) {
+            logger.warn(`[PluginDataStore] stars fetch returned undefined repo=${repoKey}`);
+            return;
+          }
+          this.marketplaceStarsByRepo.set(repoKey, {
+            stars,
+            timestamp: Date.now(),
+          });
+          logger.debug(`[PluginDataStore] stars updated repo=${repoKey} stars=${stars}`);
+          updatedCount++;
+        })
+      );
 
-      // 更新缓存
-      this.marketplaceStars.set(marketplaceName, {
-        stars,
-        timestamp: Date.now(),
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          logger.error(`[PluginDataStore] 获取 ${batch[index]} 的 stars 失败:`, result.reason);
+        }
       });
 
-      // 保存到持久化存储
-      this.saveStarsCache();
-
-      logger.debug(`[PluginDataStore] ${marketplaceName} stars: ${stars}`);
-    } catch (error) {
-      logger.error(`[PluginDataStore] 获取 ${marketplaceName} 的 stars 失败:`, error);
+      // 批次间添加小延迟，避免触发 GitHub 速率限制
+      if (i + batchSize < targetRepoKeys.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
+
+    if (updatedCount > 0) {
+      this.saveStarsCache();
+      this.notifyMarketplaceChange();
+    }
+  }
+
+  /**
+   * 手动刷新市场 stars（可选强制刷新，绕过 TTL）
+   */
+  async refreshMarketplaceStars(force: boolean = false): Promise<void> {
+    await this.refreshAllMarketplaceStars(force);
+  }
+
+  private rebuildMarketplaceRepoIndex(): void {
+    this.marketplaceRepoIndex.clear();
+
+    for (const market of this.marketplaces.values()) {
+      const repoKey = this.resolveRepoKey(market.source);
+      if (repoKey) {
+        this.marketplaceRepoIndex.set(market.name, repoKey);
+      }
+    }
+
+    BUILTIN_MARKETPLACES.forEach((builtin) => {
+      const repoKey = this.normalizeRepoKey(builtin.source);
+      this.marketplaceRepoIndex.set(builtin.name, repoKey);
+    });
+  }
+
+  private resolveRepoKey(source: unknown): string | undefined {
+    const ownerRepo = extractGitHubOwnerRepo(source as any);
+    if (!ownerRepo) {
+      return undefined;
+    }
+
+    return this.normalizeRepoKey(ownerRepo);
+  }
+
+  private normalizeRepoKey(ownerRepo: string): string {
+    return ownerRepo.replace(/\.git$/i, '').trim();
+  }
+
+  private isStarsCacheStale(entry: StarsCacheEntry | undefined, now: number = Date.now()): boolean {
+    if (!entry) {
+      return true;
+    }
+    // 兼容历史问题：0 可能来自旧逻辑的错误回退值，需要尽快重新拉取
+    if (entry.stars <= 0) {
+      return true;
+    }
+    return now - entry.timestamp >= MARKETPLACE_STARS_TTL_MS;
+  }
+
+  private async fetchRepoStarsWithDedup(repoKey: string): Promise<number | undefined> {
+    const pending = this.pendingStarRequests.get(repoKey);
+    if (pending) {
+      return pending;
+    }
+
+    const promise = this.fetchRepoStars(repoKey).finally(() => {
+      this.pendingStarRequests.delete(repoKey);
+    });
+
+    this.pendingStarRequests.set(repoKey, promise);
+    return promise;
+  }
+
+  private async fetchRepoStars(repoKey: string): Promise<number | undefined> {
+    const [owner, repo] = repoKey.split('/');
+    if (!owner || !repo) {
+      return undefined;
+    }
+    return this.dataLoader.fetchGitHubStars(owner, repo);
   }
 
   /**
@@ -283,9 +345,15 @@ export class PluginDataStore {
    * 加载所有市场的插件列表
    */
   private async loadAllPluginLists(): Promise<void> {
-    const promises = Array.from(this.marketplaces.values()).map((market) =>
-      this.loadMarketplacePluginList(market.name)
-    );
+    const promises = Array.from(this.marketplaces.values()).map(async (market) => {
+      try {
+        await this.loadMarketplacePluginList(market.name);
+        const plugins = this.pluginList.get(market.name);
+        logger.debug(`[PluginDataStore] 市场 ${market.name} 加载了 ${plugins?.length || 0} 个插件`);
+      } catch (error) {
+        logger.error(`[PluginDataStore] 加载市场 ${market.name} 失败:`, error);
+      }
+    });
     await Promise.all(promises);
   }
 
@@ -306,6 +374,9 @@ export class PluginDataStore {
    * 同步插件列表中的安装状态
    */
   private syncInstalledStatus(): void {
+    let matchedCount = 0;
+    let unmatchedCount = 0;
+
     for (const [marketplace, plugins] of this.pluginList.entries()) {
       for (const plugin of plugins) {
         const key = `${plugin.name}@${marketplace}`;
@@ -318,7 +389,20 @@ export class PluginDataStore {
           if (status.installedVersion) {
             plugin.updateAvailable = compareVersions(plugin.version, status.installedVersion) > 0;
           }
+          matchedCount++;
+        } else {
+          unmatchedCount++;
         }
+      }
+    }
+
+    logger.debug(`[PluginDataStore] syncInstalledStatus: matched=${matchedCount}, unmatched=${unmatchedCount}, installedStatusKeys=${this.installedStatus.size}`);
+
+    // 调试:打印未匹配的已安装插件
+    if (this.installedStatus.size > 0 && matchedCount === 0) {
+      logger.debug('[PluginDataStore] 所有已安装插件都未匹配,打印已安装插件列表:');
+      for (const [key, status] of this.installedStatus.entries()) {
+        logger.debug(`  - key=${key}, installed=${status.installed}, enabled=${status.enabled}`);
       }
     }
   }
@@ -615,6 +699,9 @@ export class PluginDataStore {
     this.dataLoader
       .fetchGitHubStars(owner, repo)
       .then((stars) => {
+        if (stars === undefined) {
+          return;
+        }
         // 更新缓存中的数据
         const key = `${pluginName}@${marketplace}`;
         const cached = this.pluginDetails.get(key);
@@ -678,6 +765,7 @@ export class PluginDataStore {
 
       // 重新加载市场列表
       await this.reloadMarketplaces();
+      void this.refreshAllMarketplaceStars();
 
       // 触发市场变更事件
       storeEvents.emitMarketplaceChange();
@@ -704,6 +792,7 @@ export class PluginDataStore {
       // 从缓存中移除
       this.marketplaces.delete(name);
       this.pluginList.delete(name);
+      this.marketplaceRepoIndex.delete(name);
 
       // 清除该市场下所有插件的详情缓存
       for (const key of this.pluginDetails.keys()) {
@@ -734,6 +823,7 @@ export class PluginDataStore {
 
       // 重新加载市场列表和插件列表
       await this.reloadMarketplaces();
+      void this.refreshAllMarketplaceStars();
 
       // 清除该市场的插件详情缓存（因为可能有更新）
       for (const key of this.pluginDetails.keys()) {
@@ -821,13 +911,7 @@ export class PluginDataStore {
 
     // 同步安装状态
     this.syncInstalledStatus();
-  }
-
-  /**
-   * 获取 GitHub stars（用于市场发现面板）
-   */
-  async fetchGitHubStars(owner: string, repo: string): Promise<number> {
-    return this.dataLoader.fetchGitHubStars(owner, repo);
+    this.rebuildMarketplaceRepoIndex();
   }
 
   /**
