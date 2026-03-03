@@ -1,10 +1,13 @@
 // vscode-extension/src/pluginMarketplace/webview/MarketplacePanel.ts
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PluginDataStore } from '../data/PluginDataStore';
 import { StoreEvent } from '../data/types';
 import { BUILTIN_MARKETPLACES } from '../data/MarketplaceConfig';
 import { logger } from '../../shared/utils/logger';
+import { toInlineScriptJson, toInlineStyleCss } from './utils/htmlSafety';
 
 // Webview 消息类型
 type WebviewMessage = {
@@ -312,13 +315,13 @@ export class MarketplacePanel {
     );
 
     const title = vscode.l10n.t('marketplace.discover.title');
-    const initState = encodeURIComponent(JSON.stringify({
+    const initState = {
       viewType: 'marketplace',
       locale: vscode.env.language,
       title
-    }));
-
-    const scriptUriWithState = `${scriptUri}?init=${initState}`;
+    };
+    const inlineInitState = toInlineScriptJson(initState);
+    const inlineCss = this.readMarketplaceCssFallback();
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -327,13 +330,27 @@ export class MarketplacePanel {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${this._panel.webview.cspSource} 'unsafe-inline' 'unsafe-eval'; style-src ${this._panel.webview.cspSource} 'unsafe-inline';">
   <link href="${styleUri}" rel="stylesheet">
+  ${inlineCss ? `<style>${toInlineStyleCss(inlineCss)}</style>` : ''}
   <title>${title}</title>
 </head>
 <body>
   <div id="root"></div>
-  <script>window.__LOCALE__ = ${JSON.stringify(vscode.env.language)};</script>
-  <script type="module" src="${scriptUriWithState}"></script>
+  <script>
+    window.__MARKETPLACE_INIT_STATE__ = ${inlineInitState};
+    window.__LOCALE__ = window.__MARKETPLACE_INIT_STATE__.locale;
+  </script>
+  <script type="module" src="${scriptUri}"></script>
 </body>
 </html>`;
+  }
+
+  private readMarketplaceCssFallback(): string {
+    try {
+      const cssPath = path.join(this._extensionUri.fsPath, 'webview', 'dist', 'marketplace.css');
+      return fs.readFileSync(cssPath, 'utf8');
+    } catch (error) {
+      logger.warn('[MarketplacePanel] Failed to read marketplace.css fallback:', error);
+      return '';
+    }
   }
 }

@@ -3,8 +3,25 @@ src/**
 tsconfig.json
 
 # Build files (keep out/)
-!out/**/*.js
-!out/**/*.js.map
+out/**
+!out/extension.js
+!out/extension.js.map
+!out/pluginMarketplace/types.js
+!out/pluginMarketplace/types.js.map
+!out/pluginMarketplace/data/*.js
+!out/pluginMarketplace/data/*.js.map
+!out/pluginMarketplace/webview/*.js
+!out/pluginMarketplace/webview/*.js.map
+!out/pluginMarketplace/webview/messages/*.js
+!out/pluginMarketplace/webview/messages/*.js.map
+!out/pluginMarketplace/webview/services/*.js
+!out/pluginMarketplace/webview/services/*.js.map
+!out/pluginMarketplace/webview/utils/*.js
+!out/pluginMarketplace/webview/utils/*.js.map
+!out/shared/types/*.js
+!out/shared/types/*.js.map
+!out/shared/utils/*.js
+!out/shared/utils/*.js.map
 out/**/*.ts
 
 # Tests
@@ -16,12 +33,7 @@ jest.config.js
 **/*.spec.ts
 
 # Webview source (keep dist/)
-webview/src/**
-webview/tsconfig.json
-webview/vite.config.ts
-webview/package.json
-webview/package-lock.json
-webview/node_modules/**
+webview/**
 !webview/dist/**
 
 # Dependencies
@@ -33,6 +45,11 @@ node_modules/**
 .eslintrc*
 .prettierrc*
 .vscode-test/**
+.vscode/**
+.idea/**
+.claude/**
+.codex/**
+screenshot/**
 
 # Documentation (keep CHANGELOG.md for Marketplace)
 docs/**
@@ -46,3 +63,10 @@ TESTING.md
 *.vsix
 .DS_Store
 Thumbs.db
+
+# Compiled test artifacts inside out/
+out/**/__tests__/**
+out/**/*.test.js
+out/**/*.test.js.map
+out/**/*.spec.js
+out/**/*.spec.js.map
