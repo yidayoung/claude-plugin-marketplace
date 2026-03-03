@@ -25,6 +25,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    minify: 'terser',
     rollupOptions: {
       input: {
         // 侧边栏
