@@ -1,8 +1,8 @@
 // vscode-extension/webview/src/details/DetailsApp.tsx
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Spin, Alert, Button } from 'antd';
-import { ReloadOutlined, LoadingOutlined } from '@ant-design/icons';
+
+
 import DetailHeader from './DetailHeader';
 import DetailContent from './DetailContent';
 import { useL10n } from '../l10n';

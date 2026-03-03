@@ -1,7 +1,7 @@
 // vscode-extension/webview/src/marketplace/CustomMarketInput.tsx
 
-import { Input, Button, Space, Typography, Card } from 'antd';
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+
+
 import { useL10n } from '@/l10n';
 import { type VSCodeTheme, getVSCodeColors } from './useVSCodeTheme';
 

@@ -1,7 +1,7 @@
 // vscode-extension/webview/src/marketplace/MarketplaceCard.tsx
 
-import { Button, Typography, Tag, Card, Flex } from 'antd';
-import { DeleteOutlined, PlusOutlined, GithubOutlined, StarOutlined, LinkOutlined } from '@ant-design/icons';
+
+
 import { useL10n } from '@/l10n';
 import { MARKETPLACE_CATEGORIES, type LocalizedMarketplace } from './config';
 import { getVSCodeColors, type VSCodeTheme } from './useVSCodeTheme';

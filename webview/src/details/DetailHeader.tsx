@@ -1,7 +1,7 @@
 // vscode-extension/webview/src/details/DetailHeader.tsx
 
 import React from 'react';
-import { Space, Tag, Button, Dropdown, Tooltip, Typography, Divider, Flex, Switch, Modal } from 'antd';
+
 import {
   DeleteOutlined,
   DownloadOutlined,
@@ -12,7 +12,7 @@ import {
   LinkOutlined,
   StarFilled
 } from '@ant-design/icons';
-import type { MenuProps } from 'antd';
+
 import type { PluginDetailData } from './DetailsApp';
 import { useL10n } from '../l10n';
 

@@ -2,10 +2,8 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ConfigProvider } from 'antd';
 import MarketplaceApp from './MarketplaceApp';
 import { L10nProvider } from '@/l10n';
-import { antdTheme } from '@/theme/antd-theme';
 
 declare const acquireVsCodeApi: () => any;
 
@@ -49,10 +47,8 @@ const locale = (window as Window).__LOCALE__ || (window as Window).__MARKETPLACE
 // 渲染应用
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ConfigProvider theme={antdTheme}>
-      <L10nProvider locale={locale}>
-        <MarketplaceApp />
-      </L10nProvider>
-    </ConfigProvider>
+    <L10nProvider locale={locale}>
+      <MarketplaceApp />
+    </L10nProvider>
   </React.StrictMode>
 );

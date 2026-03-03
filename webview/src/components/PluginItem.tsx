@@ -99,7 +99,7 @@ export function PluginItem({ plugin, isHovered, onHoverChange }: PluginItemProps
       {/* Plugin Name */}
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-foreground truncate">
-          {plugin.displayName || plugin.name}
+          {plugin.name}
         </div>
       </div>
 

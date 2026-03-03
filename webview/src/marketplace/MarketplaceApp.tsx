@@ -1,8 +1,8 @@
 // vscode-extension/webview/src/marketplace/MarketplaceApp.tsx
 
 import { useState, useEffect, useMemo } from 'react';
-import { message } from 'antd';
-import { StarOutlined, ThunderboltOutlined } from '@ant-design/icons';
+
+
 import { useL10n } from '@/l10n';
 import { useVSCodeTheme, getVSCodeColors } from './useVSCodeTheme';
 import { MarketplaceHeader } from './MarketplaceHeader';

@@ -1,6 +1,6 @@
 // vscode-extension/webview/src/marketplace/MarketplaceSection.tsx
 
-import { Row, Col, Typography } from 'antd';
+
 import { type VSCodeTheme, getVSCodeColors } from './useVSCodeTheme';
 import { MarketplaceCard } from './MarketplaceCard';
 import { type RecommendedMarketplace } from './config';

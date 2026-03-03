@@ -1,7 +1,7 @@
 // vscode-extension/webview/src/details/ComponentsSection.tsx
 
 import React from 'react';
-import { Typography, Collapse, Tag, Space, Alert } from 'antd';
+
 import { useL10n } from '../l10n';
 import {
   ThunderboltOutlined,

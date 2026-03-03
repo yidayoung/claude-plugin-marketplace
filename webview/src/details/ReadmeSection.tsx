@@ -1,9 +1,9 @@
 // vscode-extension/webview/src/details/ReadmeSection.tsx
 
 import React from 'react';
-import { Typography, Space } from 'antd';
+
 import { useL10n } from '../l10n';
-import { FileTextOutlined } from '@ant-design/icons';
+
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkSlug from 'remark-slug';

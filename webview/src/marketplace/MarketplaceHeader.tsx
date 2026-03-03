@@ -1,7 +1,7 @@
 // vscode-extension/webview/src/marketplace/MarketplaceHeader.tsx
 
-import { Typography } from 'antd';
-import { ThunderboltOutlined } from '@ant-design/icons';
+
+
 import { useL10n } from '@/l10n';
 import { type VSCodeTheme, getVSCodeColors } from './useVSCodeTheme';
 

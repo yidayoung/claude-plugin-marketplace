@@ -1,11 +1,10 @@
 import React from 'react';
-import { Space, Flex, Typography, Button } from 'antd';
+import { ChevronDown, ChevronUp, RefreshCw, Trash2 } from 'lucide-react';
+import { cn } from '../lib/cn';
+import { Button } from './Button';
 import { useL10n } from '../l10n';
-import { CaretDownOutlined, CaretUpOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 
-const { Text } = Typography;
-
-// 声明全局 vscode API（由外部 HTML 注入）
+// 声明全局 vscode API
 declare const vscode: {
   postMessage: (message: any) => void;
   getState: () => any;
@@ -36,52 +35,40 @@ export function PluginSection({
   actions
 }: PluginSectionProps) {
   return (
-    <Space direction="vertical" size={4} style={{ width: '100%' }}>
-      <Flex
-        align="center"
-        gap={4}
-        style={{
-          padding: '4px 8px',
-          borderRadius: 4,
-          cursor: 'pointer',
-          transition: 'background 0.15s'
-        }}
+    <div className="space-y-1">
+      <div
+        className={cn(
+          "flex items-center gap-1 px-2 py-1 rounded-md cursor-pointer",
+          "hover:bg-muted/50 transition-colors duration-200"
+        )}
         onClick={(e) => {
           if ((e.target as HTMLElement).closest('button')) {
             return;
           }
           onToggle(sectionKey);
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'var(--vscode-toolbar-hoverBackground)';
-          onHoverChange(`section-${sectionKey}`, true);
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'transparent';
-          onHoverChange(`section-${sectionKey}`, false);
-        }}
+        onMouseEnter={() => onHoverChange(`section-${sectionKey}`, true)}
+        onMouseLeave={() => onHoverChange(`section-${sectionKey}`, false)}
       >
-        <span style={{ display: 'flex', alignItems: 'center', fontSize: 10 }}>
-          {isExpanded ? <CaretDownOutlined /> : <CaretUpOutlined />}
+        <span className="flex items-center text-xs">
+          {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
         </span>
-        <Text strong>{title}</Text>
-        <Text type="secondary">({count})</Text>
+        <span className="font-medium text-sm text-foreground">{title}</span>
+        <span className="text-sm text-muted-foreground">({count})</span>
         {actions && (
           <div
-            style={{
-              marginLeft: 'auto',
-              display: 'flex',
-              gap: 2,
-              opacity: isHovered ? 1 : 0,
-              transition: 'opacity 0.15s'
-            }}
+            className={cn(
+              "ml-auto flex items-center gap-0.5",
+              "opacity-0 group-hover:opacity-100 transition-opacity duration-200",
+              isHovered && "opacity-100"
+            )}
           >
             {actions}
           </div>
         )}
-      </Flex>
-      {isExpanded && <div style={{ paddingLeft: 16 }}>{children}</div>}
-    </Space>
+      </div>
+      {isExpanded && <div className="pl-4">{children}</div>}
+    </div>
   );
 }
 
@@ -91,6 +78,7 @@ interface MarketSectionActionsProps {
 
 export function MarketSectionActions({ marketName }: MarketSectionActionsProps) {
   const { t } = useL10n();
+
   const handleRefreshMarket = (e: React.MouseEvent) => {
     e.stopPropagation();
     vscode.postMessage({
@@ -110,21 +98,21 @@ export function MarketSectionActions({ marketName }: MarketSectionActionsProps) 
   return (
     <>
       <Button
-        type="text"
-        size="small"
-        icon={<ReloadOutlined />}
+        size="sm"
+        variant="ghost"
         onClick={handleRefreshMarket}
         title={t('section.refreshMarket')}
-        style={{ padding: '0 4px', minWidth: 20 }}
-      />
+      >
+        <RefreshCw className="w-3 h-3" />
+      </Button>
       <Button
-        type="text"
-        size="small"
-        icon={<DeleteOutlined />}
+        size="sm"
+        variant="ghost"
         onClick={handleRemoveMarket}
         title={t('section.removeMarket')}
-        style={{ padding: '0 4px', minWidth: 20 }}
-      />
+      >
+        <Trash2 className="w-3 h-3" />
+      </Button>
     </>
   );
 }

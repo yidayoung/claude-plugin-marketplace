@@ -1,9 +1,9 @@
 // vscode-extension/webview/src/details/DetailContent.tsx
 
 import React from 'react';
-import { Typography, Tag, Space } from 'antd';
+
 import { useL10n } from '../l10n';
-import { FileTextOutlined } from '@ant-design/icons';
+
 import type { PluginDetailData } from './DetailsApp';
 import ComponentsSection from './ComponentsSection';
 import ReadmeSection from './ReadmeSection';

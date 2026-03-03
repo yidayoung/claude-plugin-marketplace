@@ -1,9 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ConfigProvider } from 'antd';
 import DetailsApp from './DetailsApp';
 import './details.css';
-import { antdTheme } from '@/theme/antd-theme';
 import { L10nProvider } from '@/l10n';
 
 declare const acquireVsCodeApi: () => any;
@@ -33,10 +31,8 @@ if (!(window as any).vscode) {
 const locale = (window as Window).__LOCALE__ || (window as Window).__DETAILS_INIT_STATE__?.locale || 'en';
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ConfigProvider theme={antdTheme}>
-      <L10nProvider locale={locale}>
-        <DetailsApp />
-      </L10nProvider>
-    </ConfigProvider>
+    <L10nProvider locale={locale}>
+      <DetailsApp />
+    </L10nProvider>
   </React.StrictMode>
 );
